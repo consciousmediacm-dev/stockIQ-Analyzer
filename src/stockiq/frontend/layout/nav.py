@@ -26,7 +26,6 @@ def get_pages() -> dict:
             st.Page(f"{_VIEWS}/market_screener.py",         title="Market Screener (all US)", icon="🗺️", url_path="market-screener"),
             st.Page(f"{_VIEWS}/premarket_scanner.py",       title="Pre-Market Scanner",    icon="🌅", url_path="premarket"),
             st.Page(f"{_VIEWS}/nasdaq_rsi_scanner.py",      title="NASDAQ RSI Scanner",    icon="📊", url_path="nasdaq-oversold"),
-            st.Page(f"{_VIEWS}/bounce_radar_scanner.py",    title="MA200 Bounce Radar",    icon="📡", url_path="bounce-radar"),
             st.Page(f"{_VIEWS}/squeeze_scanner.py",         title="Short Squeeze Scanner", icon="🔥", url_path="squeeze"),
             st.Page(f"{_VIEWS}/strong_buy_scanner.py",      title="Analyst Buy Picks",     icon="💎", url_path="strong-buy"),
             st.Page(f"{_VIEWS}/strong_sell_scanner.py",     title="Analyst Sell Picks",    icon="🔻", url_path="strong-sell"),

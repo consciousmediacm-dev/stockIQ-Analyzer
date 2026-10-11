@@ -1,26 +1,23 @@
-"""Signal analysis + Buying Pressure (BX) panels for the Stock Analyzer page."""
+"""Indicator readout + Buying Pressure (BX) panels for the Stock Analyzer page."""
 
 import pandas as pd
 import streamlit as st
 
 from stockiq.backend.services.analyzer_service import get_buying_pressure
-from stockiq.frontend.theme import MUT, SEP
+from stockiq.frontend.theme import DN, MUT, UP
 
 
-def render_signal_analysis(sig: dict) -> None:
-    score        = sig["score"]
-    signal_color = sig["color"]
-
-    st.markdown("**Signal Analysis**")
-    score_bar_pct = min(100, max(0, (score + 8) / 16 * 100))
-    st.markdown(
-        f'<div style="background:{SEP};border-radius:6px;height:6px;margin-bottom:10px">'
-        f'<div style="width:{score_bar_pct:.0f}%;height:100%;background:{signal_color};'
-        f'border-radius:6px"></div></div>',
-        unsafe_allow_html=True,
-    )
-    for reason in sig["reasons"]:
-        st.markdown(_reason_icon(reason))
+def render_indicator_readout(readout: dict) -> None:
+    st.markdown("**Indicator Readout**")
+    st.caption("Where price sits relative to its indicators — descriptive, not a buy/sell call.")
+    icons = {"up": "▲", "down": "▼", "flat": "•"}
+    colors = {"up": UP, "down": DN, "flat": MUT}
+    for direction, text in readout["notes"]:
+        st.markdown(
+            f'<div style="font-size:0.88rem;margin:3px 0">'
+            f'<span style="color:{colors[direction]};margin-right:6px">{icons[direction]}</span>{text}</div>',
+            unsafe_allow_html=True,
+        )
 
 
 def render_buying_pressure(df: pd.DataFrame) -> None:
@@ -33,15 +30,6 @@ def render_buying_pressure(df: pd.DataFrame) -> None:
 
 
 # ── Private helpers ────────────────────────────────────────────────────────────
-
-def _reason_icon(text: str) -> str:
-    lc = text.lower()
-    if any(w in lc for w in ("above", "golden cross", "positive", "uptrend", "oversold")):
-        return f"🟢 {text}"
-    if any(w in lc for w in ("below", "death cross", "negative", "downtrend", "overbought")):
-        return f"🔴 {text}"
-    return f"⚪ {text}"
-
 
 def _render_bx_panel(bx: dict, label: str) -> None:
     strength = bx["strength"]

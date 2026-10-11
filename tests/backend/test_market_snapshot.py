@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 import stockiq.backend.data.market_snapshot as loader
-from stockiq.backend.backtest.signals_vec import add_indicators, score_components
+from stockiq.backend.backtest.signals_vec import add_indicators
 from stockiq.backend.market.snapshot import SNAPSHOT_COLUMNS, build_snapshot, snapshot_row
 from stockiq.backend.services.market_screener_service import (
     PRESETS,
@@ -29,29 +29,27 @@ def _hist(n=1200, seed=1, end="2026-10-09", price=100.0):
 
 # ── snapshot_row ──────────────────────────────────────────────────────────────
 
-def test_row_matches_analyzer_score_and_has_all_columns():
+def test_row_matches_analyzer_indicators_and_has_all_columns():
     df = _hist()
     row = snapshot_row("AAA", df, {"name": "A", "exchange": "NYSE", "is_etf": False}, today=TODAY)
     assert set(row) == set(SNAPSHOT_COLUMNS)
-    expected = score_components(add_indicators(df)).iloc[-1]
-    assert row["score"] == expected["score"] and row["label"] == expected["label"]
+    ind = add_indicators(df).iloc[-1]
+    assert row["rsi"] == round(ind["RSI"], 1) and row["ma200"] == round(ind["MA200"], 2)
+    expected_above = sum(ind["Close"] > ind[f"MA{p}"] for p in (5, 20, 50, 100, 200))
+    assert row["above_ma_count"] == expected_above
     assert row["close"] == round(df["Close"].iloc[-1], 2)
     assert row["ret_1w_pct"] == pytest.approx((df["Close"].iloc[-1] / df["Close"].iloc[-6] - 1) * 100, abs=0.01)
+    assert "score" not in row and "bounce_score" not in row     # retired by user decision
 
 
-def test_young_listing_gets_row_but_no_score():
+def test_young_listing_gets_row_without_long_averages():
     row = snapshot_row("NEW", _hist(n=120), today=TODAY)
-    assert row is not None and row["score"] is None and row["ma200"] is None and row["rsi"] is not None
+    assert row is not None and row["ma200"] is None and row["ma200w"] is None and row["rsi"] is not None
 
 
 @pytest.mark.parametrize("n, end", [(10, "2026-10-09"), (300, "2026-08-01")])
 def test_too_short_or_stale_is_skipped(n, end):
     assert snapshot_row("X", _hist(n=n, end=end), today=TODAY) is None
-
-
-def test_bounce_score_only_inside_band():
-    row = snapshot_row("AAA", _hist(), today=TODAY)
-    assert (row["bounce_score"] is not None) == (abs(row["dist_ma200_pct"]) <= 5)
 
 
 # ── build_snapshot ────────────────────────────────────────────────────────────
@@ -135,6 +133,22 @@ def test_screen_filters(snap_df):
 def test_every_preset_runs(snap_df, preset):
     f, extra = filters_from_preset(preset)
     screen_market(snap_df, f, **extra)
+
+
+def test_above_ma_presets(snap_df):
+    f, extra = filters_from_preset("Above all 5 moving averages")
+    out = screen_market(snap_df, f, **extra)
+    assert (out["above_ma_count"] == 5).all()
+    f, extra = filters_from_preset("Below all 5 moving averages")
+    assert (screen_market(snap_df, f, **extra)["above_ma_count"] == 0).all()
+
+
+def test_loader_aligns_old_schema(tmp_path, monkeypatch, snap_df):
+    old = snap_df.drop(columns=["above_ma_count", "dist_ma200w_pct"]).assign(score=1, bounce_score=2.0)
+    path = tmp_path / "old.parquet"
+    old.to_parquet(path)
+    df = loader._read(path)
+    assert list(df.columns) == SNAPSHOT_COLUMNS and df["above_ma_count"].isna().all()
 
 
 def test_preset_overrides():

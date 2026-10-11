@@ -282,7 +282,7 @@ def etf_category_heatmap(df) -> go.Figure:
     return fig
 
 
-# ── Bounce Radar ──────────────────────────────────────────────────────────────
+# ── RSI bar (shared) ──────────────────────────────────────────────────────────
 
 def rsi_bar(df) -> go.Figure:
     """Bar: RSI values per ticker with oversold/overbought reference lines."""

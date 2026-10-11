@@ -11,7 +11,7 @@ from stockiq.backend.services.analyzer_service import (
     get_stock_df,
     get_stock_fibonacci,
     get_stock_gaps,
-    get_stock_signal,
+    get_indicator_readout,
     get_ticker_fundamentals,
     search_stocks,
 )
@@ -21,7 +21,7 @@ from stockiq.frontend.views.components.gap_table import render_gap_table
 from stockiq.frontend.views.panels.analyzer_fundamentals import render_fundamentals_panel
 from stockiq.frontend.views.panels.analyzer_signals import (
     render_buying_pressure,
-    render_signal_analysis,
+    render_indicator_readout,
 )
 
 _TICKER_CHARS = re.compile(r"[^A-Z0-9.\-^=!:&]")
@@ -117,9 +117,8 @@ def render_analyzer_tab() -> None:
 
     df           = st.session_state.analyzer_df
     company_name = st.session_state.analyzer_company
-    sig          = get_stock_signal(df)
-    latest, prev = sig["latest"], sig["prev"]
-    score, signal_label, signal_color = sig["score"], sig["label"], sig["color"]
+    readout      = get_indicator_readout(df)
+    latest, prev = readout["latest"], readout["prev"]
 
     price      = float(latest["Close"])
     prev_close = float(prev["Close"])
@@ -141,7 +140,7 @@ def render_analyzer_tab() -> None:
     )
 
     # ── Sections 1 + 2: Combined header + quick stats ────────────────────────
-    # Company name + price + signal badge — all on one line
+    # Company name + price — all on one line
     st.markdown(
         f'<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">'
         f'<span style="font-size:1.25rem;font-weight:700;color:{VAL}">{company_name}</span>'
@@ -150,10 +149,6 @@ def render_analyzer_tab() -> None:
         f'${price:,.2f}</span>'
         f'<span style="font-size:0.9rem;color:{chg_clr}">'
         f'{arrow} {abs(chg):.2f} ({chg_pct:+.2f}%)</span>'
-        f'<span style="background:{signal_color};color:#fff;font-size:0.82rem;font-weight:700;'
-        f'padding:3px 14px;border-radius:20px;letter-spacing:.04em;margin-left:8px">'
-        f'{signal_label}</span>'
-        f'<span style="color:{MUT};font-size:0.78rem">Score {score:+d}</span>'
         f'</div>',
         unsafe_allow_html=True,
     )
@@ -233,7 +228,7 @@ def render_analyzer_tab() -> None:
     # ── Section 5+6: Signals + BX + Key Levels ───────────────────────────────
     sig_col, bx_col, lvl_col = st.columns([3, 2, 2])
     with sig_col:
-        render_signal_analysis(sig)
+        render_indicator_readout(readout)
     with bx_col:
         render_buying_pressure(df)
     with lvl_col:

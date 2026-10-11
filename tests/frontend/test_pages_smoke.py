@@ -68,3 +68,27 @@ def test_market_screener_renders_with_data(monkeypatch):
     assert len(at.dataframe) == 1
     at.selectbox[0].set_value("Oversold (RSI ≤ 30)").run()
     assert not at.exception
+
+
+def test_analyzer_shows_readout_and_no_buy_sell_badge(monkeypatch):
+    import pandas as pd
+
+    import stockiq.backend.services.analyzer_service as svc
+    from stockiq.backend.backtest.signals_vec import add_indicators
+    from stockiq.backend.models.indicators import detect_reversal_patterns
+    from tests.conftest import _make_ohlcv
+
+    df = _make_ohlcv(n=1500, base_price=120, seed=3)
+    df.index = pd.bdate_range(end=pd.Timestamp.today().normalize(), periods=1500)
+    df = detect_reversal_patterns(add_indicators(df))
+    monkeypatch.setattr(svc, "fetch_ohlcv", lambda t, d: df[["Open", "High", "Low", "Close", "Volume"]])
+    monkeypatch.setattr(svc, "get_company_name", lambda t: "Test Co")
+    monkeypatch.setattr(svc, "get_ticker_fundamentals", lambda t: {})
+
+    at = AppTest.from_file(str(VIEWS / "analyzer.py"), default_timeout=60)
+    at.query_params["tic"] = "TEST"
+    at.run()
+    assert not at.exception, at.exception
+    page = " ".join(m.value for m in at.markdown)
+    assert "Indicator Readout" in page and "moving averages" in page
+    assert not any(w in page for w in ("STRONG BUY", "STRONG SELL", "Score +", "Score -"))

@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
     menu_items={
         "About": "Free stock technical analysis: moving averages, RSI, Fibonacci retracement, "
-                 "short squeeze scanner, bounce radar, and Munger quality watchlist."
+                 "short squeeze scanner, full-market screener, and Munger quality watchlist."
     },
 )
 

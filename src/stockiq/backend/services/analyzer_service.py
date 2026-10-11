@@ -15,7 +15,7 @@ from stockiq.backend.models.indicators import (
     detect_reversal_patterns,
     patch_today_gap,
 )
-from stockiq.backend.models.signals import find_crosses, overall_signal, signal_score
+from stockiq.backend.models.signals import find_crosses, indicator_readout
 
 logger = logging.getLogger(__name__)
 
@@ -40,25 +40,16 @@ def get_stock_df(ticker: str) -> pd.DataFrame:
     return df
 
 
-def get_stock_signal(df: pd.DataFrame) -> dict:
+def get_indicator_readout(df: pd.DataFrame) -> dict:
     """
-    Compute buy/sell signal from the latest two rows of a pre-computed indicator df.
+    Latest/previous bars plus a neutral indicator readout (no buy/sell verdict).
 
     Returns:
-        {score, label, color, reasons, latest (Series), prev (Series)}
+        {latest (Series), prev (Series), notes: [(direction, text), ...]}
     """
     latest = df.iloc[-1]
     prev   = df.iloc[-2]
-    score, reasons = signal_score(latest, prev)
-    label, color   = overall_signal(score)
-    return {
-        "score":   score,
-        "label":   label,
-        "color":   color,
-        "reasons": reasons,
-        "latest":  latest,
-        "prev":    prev,
-    }
+    return {"latest": latest, "prev": prev, "notes": indicator_readout(latest, prev)}
 
 
 def get_stock_fibonacci(df: pd.DataFrame) -> dict:

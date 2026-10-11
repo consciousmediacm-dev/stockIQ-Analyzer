@@ -15,7 +15,8 @@ def render_about_tab() -> None:
     - **Fibonacci Retracement**: Identify potential support and resistance levels
     - **Reversal Pattern Detection**: Automatic detection of 7 candlestick reversal patterns
     - **Golden/Death Cross Signals**: Major trend reversal indicators based on MA50 and MA200 crossovers
-    - **Buy/Sell Signal Score**: Scoring system combining multiple technical indicators
+    - **Indicator Readout**: Plain description of where price sits relative to its averages and RSI
+    - **Signal Backtest**: See how indicator readings have actually played out historically
     - **Weekly Trend Analysis**: 200-week moving average for long-term secular trend confirmation
 
     **How It Works:**

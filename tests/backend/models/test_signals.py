@@ -264,3 +264,27 @@ class TestFindCrosses:
         golden, death = find_crosses(df)
         overlap = golden.intersection(death)
         assert len(overlap) == 0
+
+
+
+# ── indicator_readout (neutral, no verdict) ────────────────────────────────────
+
+class TestIndicatorReadout:
+    def test_describes_without_buy_sell_words(self):
+        from stockiq.backend.models.signals import indicator_readout
+        row = _make_row(Close=200, MA5=195, MA20=190, MA50=170, MA100=150, MA200=120, MA200W=100, RSI=72)
+        prev = _make_row(MA50=165, MA200=120)
+        notes = indicator_readout(row, prev)
+        text = " ".join(t for _, t in notes).lower()
+        assert "above 5 of 5" in text and "overbought zone" in text and "+100.0%" in text
+        assert not any(w in text for w in ("buy", "sell", "bullish", "bearish"))
+        assert {d for d, _ in notes} <= {"up", "down", "flat"}
+
+    def test_golden_cross_today(self):
+        from stockiq.backend.models.signals import indicator_readout
+        notes = indicator_readout(_make_row(MA50=121, MA200=120), _make_row(MA50=119, MA200=120))
+        assert ("up", "MA50 crossed above MA200 today (golden cross)") in notes
+
+    def test_missing_indicators_are_skipped(self):
+        from stockiq.backend.models.signals import indicator_readout
+        assert indicator_readout(_make_row(), _make_row()) == []

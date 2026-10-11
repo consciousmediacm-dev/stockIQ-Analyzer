@@ -21,8 +21,9 @@ def _highlight_baseline(df):
 def render_backtest_page() -> None:
     st.title("🧪 Signal Backtest")
     st.markdown(
-        "Replays the **Stock Analyzer signal score** and the **price-only scanners** "
-        "(Candle Screener, MA200 Bounce Radar, RSI zones) over history and measures what "
+        "Replays the **retired buy/sell signal score** (removed from the Analyzer after it showed no edge) "
+        "and the **price-only scanners** "
+        "(Candle Screener, the removed MA200 Bounce Radar, RSI zones) over history and measures what "
         "happened next. Compare every row to **ALL (baseline)** — a signal is only useful "
         "if it beats doing nothing."
     )

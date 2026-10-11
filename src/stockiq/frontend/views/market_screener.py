@@ -8,18 +8,17 @@ from stockiq.backend.services.market_screener_service import (
     screen_market,
 )
 
-_LABELS = ["STRONG BUY", "BUY", "NEUTRAL", "SELL", "STRONG SELL"]
 _SORTS = {
-    "20-day $ volume": "dollar_vol_20", "Signal score": "score", "RSI": "rsi",
+    "20-day $ volume": "dollar_vol_20", "RSI": "rsi",
     "1-day %": "chg_1d_pct", "1-week %": "ret_1w_pct", "1-month %": "ret_1m_pct",
     "3-month %": "ret_3m_pct", "1-year %": "ret_1y_pct", "Distance from MA200 %": "dist_ma200_pct",
-    "Bounce score": "bounce_score", "% from 52-week high": "pct_from_52w_high", "Price": "close",
+    "% from 52-week high": "pct_from_52w_high", "Price": "close",
 }
 _COLUMNS = {
     "symbol": "Symbol", "name": "Name", "is_etf": "ETF", "exchange": "Exchange", "close": "Price",
     "chg_1d_pct": "1D %", "ret_1m_pct": "1M %", "ret_1y_pct": "1Y %", "rsi": "RSI",
-    "dist_ma200_pct": "vs MA200 %", "label": "Signal", "score": "Score", "candle_signal": "Candles",
-    "bounce_score": "Bounce", "pct_from_52w_high": "From 52W high %", "dollar_vol_20": "Avg $ vol (20d)",
+    "dist_ma200_pct": "vs MA200 %", "above_ma_count": "Above MAs (of 5)", "candle_signal": "Candles",
+    "pct_from_52w_high": "From 52W high %", "dollar_vol_20": "Avg $ vol (20d)",
     "link": "Analyze",
 }
 
@@ -27,7 +26,8 @@ _COLUMNS = {
 def render_market_screener() -> None:
     st.title("🗺️ Market Screener")
     st.caption("Every active US-listed stock and ETF, refreshed nightly after the close. "
-               "Same indicators and scoring as the Stock Analyzer.")
+               "Same indicator calculations as the Stock Analyzer. Filters describe where prices "
+               "sit today — they are not buy or sell recommendations.")
 
     snap = get_market_snapshot()
     df = snap["df"]
@@ -62,7 +62,7 @@ def render_market_screener() -> None:
         exchanges = f3.multiselect("Exchange", sorted(df["exchange"].dropna().unique()))
         g1, g2, g3 = st.columns(3)
         rsi_rng = g1.slider("RSI range", 0, 100, (0, 100))
-        labels = g2.multiselect("Signal score", _LABELS)
+        above_ma = g2.select_slider("Above how many of the 5 MAs", options=["Any", 0, 1, 2, 3, 4, 5], value="Any")
         candles = g3.multiselect("Candle signal", [lbl for lbl, _ in CANDLE_SIGNALS])
         h1, h2, h3 = st.columns(3)
         sort_label = h1.selectbox("Sort by", ["Preset default"] + list(_SORTS))
@@ -74,8 +74,10 @@ def render_market_screener() -> None:
         asset_type=asset, query=query or None, min_price=min_price or None,
         min_dollar_vol=min_dvol or None, exchanges=exchanges or None,
         rsi_min=rsi_rng[0] if rsi_rng[0] > 0 else None, rsi_max=rsi_rng[1] if rsi_rng[1] < 100 else None,
-        labels=labels or None, candle_signals=candles or None, top_n=int(top_n),
+        candle_signals=candles or None, top_n=int(top_n),
     )
+    if above_ma != "Any":
+        extra["min_above_ma"] = extra["max_above_ma"] = int(above_ma)
     if sort_label != "Preset default":
         filters.sort_by, filters.ascending = _SORTS[sort_label], ascending
         extra.pop("abs_sort", None)
