@@ -19,3 +19,7 @@ reports/
 
 # Build artifacts
 *.egg-info/
+
+# Local full-market snapshot (published as a release asset, never committed)
+cache/market/*.parquet
+dist/

@@ -34,6 +34,8 @@ with open(_backend_dir / "app.yml") as _f:
 QUOTE_SPY_PROVIDERS:   list[str] = _app["quote"]["spy_providers"]
 OPTIONS_SPY_PROVIDERS: list[str] = _app["options"]["spy_providers"]
 HISTORY_PROVIDERS:     list[str] = _app.get("history", {}).get("providers", ["yahoo"])
+MARKET_SNAPSHOT_URL:   str       = os.environ.get("MARKET_SNAPSHOT_URL") or _app.get("market_snapshot", {}).get("url", "")
+MARKET_SNAPSHOT_REFRESH_HOURS: float = float(_app.get("market_snapshot", {}).get("refresh_hours", 6))
 
 # ── Cache TTLs (backend-only) ──────────────────────────────────────────────────
 with open(_backend_dir / "cache.yml") as _f:

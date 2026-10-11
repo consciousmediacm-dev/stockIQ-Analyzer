@@ -46,3 +46,25 @@ def test_analyzer_ticker_is_sanitised_before_reaching_the_chart():
     value = at.text_input[1].value
     assert value == "AAPLALERT1"                     # letters/digits kept …
     assert not set(value) & set('"\'();/{}<> ')    # … nothing that can break out of the JS string
+
+
+def test_market_screener_renders_with_data(monkeypatch):
+    import pandas as pd
+
+    import stockiq.backend.services.market_screener_service as svc
+    from stockiq.backend.market.snapshot import SNAPSHOT_COLUMNS, snapshot_row
+    from tests.conftest import _make_ohlcv
+
+    rows = []
+    for i in range(8):
+        df = _make_ohlcv(n=1200, base_price=30 + 20 * i, seed=i)
+        df.index = pd.bdate_range(end=pd.Timestamp.today().normalize(), periods=1200)
+        rows.append(snapshot_row(f"S{i}", df, {"name": f"Co {i}", "exchange": "NYSE", "is_etf": i % 3 == 0}))
+    monkeypatch.setattr(svc, "load_market_snapshot", lambda: pd.DataFrame(rows, columns=SNAPSHOT_COLUMNS))
+
+    at = AppTest.from_file(str(VIEWS / "market_screener.py"), default_timeout=60).run()
+    assert not at.exception, at.exception
+    assert at.metric[0].value == "8"
+    assert len(at.dataframe) == 1
+    at.selectbox[0].set_value("Oversold (RSI ≤ 30)").run()
+    assert not at.exception

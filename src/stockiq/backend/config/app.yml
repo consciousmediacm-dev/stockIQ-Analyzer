@@ -31,3 +31,11 @@ history:
   #   alphavantage  — Alpha Vantage (needs ALPHA_VANTAGE_API_KEY; set ALPHA_VANTAGE_PREMIUM=true
   #                   on a paid plan for split-adjusted data and higher rate limits)
   providers: [yahoo, alphavantage]
+
+market_snapshot:
+  # Nightly full-market snapshot (all US stocks + ETFs), published by
+  # .github/workflows/market_snapshot.yml as a GitHub Release asset.
+  # The app uses a local copy at cache/market/market_snapshot.parquet when present,
+  # otherwise downloads this URL (override with MARKET_SNAPSHOT_URL).
+  url: "https://github.com/consciousmediacm-dev/stockIQ-Analyzer/releases/download/market-data/market_snapshot.parquet"
+  refresh_hours: 6

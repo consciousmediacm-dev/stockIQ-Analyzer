@@ -1,0 +1,68 @@
+name: Market Snapshot
+
+# Indicators for every active US stock and ETF (~10k symbols), published as the
+# `market_snapshot.parquet` asset of the rolling `market-data` release. The app
+# downloads it (see src/stockiq/backend/data/market_snapshot.py), so nothing is
+# committed to main and the repo doesn't grow.
+
+on:
+  schedule:
+    # Mon–Fri 22:30 UTC — after the US close (20:00 UTC in summer, 21:00 in winter)
+    - cron: "30 22 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Only the first N symbols (0 = all) — for a quick test run"
+        default: "0"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: market-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools
+          pip install -c constraints.txt -e .
+
+      - name: Ensure the US universe list exists
+        env:
+          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+        run: |
+          if [ ! -f cache/screener/universe.json ]; then
+            python cache/scripts/build_universe_cache.py
+          fi
+
+      - name: Build snapshot
+        env:
+          IN_LIMIT: ${{ github.event.inputs.limit || '0' }}
+        run: python cache/scripts/build_market_snapshot.py --out dist/market_snapshot.parquet --limit "$IN_LIMIT"
+
+      - name: Publish to the market-data release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh release view market-data >/dev/null 2>&1; then
+            gh release create market-data --title "Market data (nightly)" --latest=false \
+              --notes "Updated automatically by the Market Snapshot workflow. Data files only — not a software release."
+          fi
+          gh release upload market-data dist/market_snapshot.parquet dist/market_snapshot.json --clobber

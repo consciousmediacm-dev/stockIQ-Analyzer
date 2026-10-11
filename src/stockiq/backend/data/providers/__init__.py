@@ -133,10 +133,13 @@ def get_daily_history(
     end: date | None = None,
     providers: list[str] | None = None,
     min_rows: int = 1,
+    use_breaker: bool = True,
 ) -> dict[str, pd.DataFrame]:
     """
     Daily adjusted OHLCV for each ticker (start..end inclusive) with failover.
     Returns {ticker: DataFrame}; tickers no provider could serve are absent.
+    use_breaker=False is for batch jobs (nightly snapshot): a chunk of thinly
+    traded symbols can legitimately return nothing and must not trip the breaker.
     """
     end = end or date.today()
     remaining = list(dict.fromkeys(tickers))
@@ -149,9 +152,9 @@ def get_daily_history(
             logger.warning("Unknown history provider %r in config", name)
             continue
         provider = get_provider(name)
-        if not provider.is_configured() or _is_down(name):
+        if not provider.is_configured() or (use_breaker and _is_down(name)):
             continue
-        if len(remaining) > PROBE_THRESHOLD and not _probe_ok(provider):
+        if use_breaker and len(remaining) > PROBE_THRESHOLD and not _probe_ok(provider):
             _trip(name, f"probe {getattr(provider, 'probe_symbol', '')} returned no data")
             continue
         try:
@@ -162,10 +165,10 @@ def get_daily_history(
         except ProviderError as exc:
             logger.warning("%s history failed for %d tickers: %s", name, len(remaining), exc)
             _record(name, error=str(exc))
-            if not isinstance(exc, RateLimitError):
+            if use_breaker and not isinstance(exc, RateLimitError):
                 _trip(name, str(exc)[:120])
             continue
-        if not got and len(remaining) >= 5:
+        if use_breaker and not got and len(remaining) >= 5:
             _trip(name, f"returned nothing for {len(remaining)} tickers")
             continue
 
