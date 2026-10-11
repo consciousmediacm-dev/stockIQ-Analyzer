@@ -1,0 +1,66 @@
+name: Backtest
+
+# Runs the signal backtest on real market data (GitHub's runners have open
+# network access). The report is printed to the job log and attached as an
+# artifact. Trigger from the Actions tab → Backtest → Run workflow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tickers:
+        description: "First N tickers of the S&P universe (ignored if symbols is set)"
+        default: "300"
+      symbols:
+        description: "Explicit space-separated symbols (optional)"
+        default: ""
+      years:
+        description: "Evaluation window in years"
+        default: "10"
+      step:
+        description: "Sample every N trading days (use ≥ 20 for non-overlapping 20-day samples)"
+        default: "5"
+
+permissions:
+  contents: read
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip setuptools
+          pip install -c constraints.txt -e .
+
+      - name: Run backtest
+        env:
+          IN_TICKERS: ${{ github.event.inputs.tickers }}
+          IN_SYMBOLS: ${{ github.event.inputs.symbols }}
+          IN_YEARS: ${{ github.event.inputs.years }}
+          IN_STEP: ${{ github.event.inputs.step }}
+        run: |
+          set -euo pipefail
+          ARGS=(--years "$IN_YEARS" --step "$IN_STEP" --out reports/backtest)
+          if [ -n "$IN_SYMBOLS" ]; then
+            read -r -a SYMS <<< "$IN_SYMBOLS"
+            python -m stockiq.backend.backtest "${ARGS[@]}" --symbols "${SYMS[@]}"
+          else
+            python -m stockiq.backend.backtest "${ARGS[@]}" --tickers "$IN_TICKERS"
+          fi
+
+      - name: Print report
+        run: cat reports/backtest/report.md
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backtest-report
+          path: reports/backtest/

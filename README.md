@@ -34,6 +34,7 @@
 
 | Page | What it does |
 |------|-------------|
+| **Market Screener (all US)** | Every active US-listed stock and ETF (~10k), refreshed nightly: filter by type, exchange, price, liquidity, RSI, signal score, candle signal, MA200 distance, 52-week high; presets for the scanners below; one click opens the Analyzer |
 | **Pre-Market Scanner** | NASDAQ-100 pre-market movers with a 7-day daily close heatmap |
 | **NASDAQ RSI Scanner** | NASDAQ-100 stocks filtered by RSI — quickly spot oversold / overbought conditions |
 | **MA200 Bounce Radar** | Stocks within 5% of their 200-day MA — classic mean-reversion setups |
@@ -193,6 +194,19 @@ The same results are available in the app under **Research → Signal Backtest**
 Entry is the next day's open (no look-ahead). Read the caveats at the top of every report —
 survivorship bias, overlapping windows and zero trading costs all flatter the results.
 Fundamentals-based scanners are not backtested because only a current snapshot is stored.
+
+---
+
+## Scheduled jobs (GitHub Actions)
+
+| Workflow | When | What |
+|----------|------|------|
+| **CI** | every PR / push to main | tests on Python 3.11 + 3.12, lint, import check, Docker build + health check |
+| **Refresh Screener Cache** | nightly 02:00 UTC (full on Sundays) | analyst, forward P/E, short interest, fundamentals, metadata, US universe → committed to `main` |
+| **Market Snapshot** | Mon–Fri 22:30 UTC | indicators for every US stock + ETF → `market_snapshot.parquet` on the `market-data` release (not committed) |
+| **Backtest** | manual (Actions → Backtest → Run workflow) | signal backtest on real data; report printed in the log and attached as an artifact |
+
+Actions must be enabled on the repository (Actions tab) for any of these to run.
 
 ---
 
