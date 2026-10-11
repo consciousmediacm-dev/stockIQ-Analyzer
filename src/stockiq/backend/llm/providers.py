@@ -1,5 +1,6 @@
 """Multi-provider LLM wrappers and in-process forecast cache."""
 
+import hashlib
 import os
 
 import requests as _requests
@@ -152,6 +153,18 @@ _CALLERS = {
 _forecast_cache = MemoryCache()
 
 
+def forecast_store_key(cache_key: str, provider: str, user_key: str = "") -> str:
+    """
+    Cache key for a forecast. Results bought with a visitor's personal API key are
+    namespaced by a hash of that key, so they are never served to other visitors
+    (and the key itself is never stored).
+    """
+    key = f"{cache_key}-{provider}"
+    if user_key:
+        key += "-u" + hashlib.sha256(user_key.encode()).hexdigest()[:12]
+    return key
+
+
 def fetch_ai_prediction(
     cache_key: str,
     _context_json: str,
@@ -162,9 +175,11 @@ def fetch_ai_prediction(
 
     cache_key  = "YYYY-MM-DD-HH-<provider>" — stable for one hour.
     _context_json and _user_key are prefixed with _ to signal they are not
-    part of the cache key (mirrors @st.cache_data leading-underscore convention).
+    part of the cache key (personal-key results get their own namespace, see
+    forecast_store_key). Empty results (missing key, unparseable reply) are not
+    cached, so fixing the key or retrying works immediately.
     """
-    store_key = f"{cache_key}-{provider}"
+    store_key = forecast_store_key(cache_key, provider, _user_key)
     ttl = CACHE_TTL["fetch_ai_prediction"]
 
     result, hit = _forecast_cache.get(store_key)
@@ -176,5 +191,6 @@ def fetch_ai_prediction(
         raise ValueError(f"Unknown provider: {provider!r}")
 
     result = caller(_context_json, user_key=_user_key)
-    _forecast_cache.set(store_key, result, ttl)
+    if result:
+        _forecast_cache.set(store_key, result, ttl)
     return result

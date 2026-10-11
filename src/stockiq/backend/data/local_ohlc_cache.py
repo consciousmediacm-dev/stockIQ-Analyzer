@@ -6,18 +6,21 @@ Yahoo's occasional gaps in the last 2-3 trading days never cause ⏳ Pending
 status in the gap table, and the gap algorithm always has enough future bars
 to confirm fill status.
 
-Cache location : ~/.stockiq/ohlc_cache.json
+Cache location : $STOCKIQ_DATA_DIR (default ~/.stockiq)/ohlc_cache.json
 Retention      : 45 trading days (30 display rows + 14 RSI warmup + buffer)
 Today's bar    : never cached — still mutable while the market is open
 """
 
 import json
+import os
+import threading
 from datetime import date, timedelta
-from pathlib import Path
 
 import pandas as pd
 
-_CACHE_FILE = Path.home() / ".stockiq" / "ohlc_cache.json"
+from stockiq.backend.cache import DATA_DIR
+
+_CACHE_FILE = DATA_DIR / "ohlc_cache.json"
 _KEEP_DAYS  = 45
 _OHLC_COLS  = ["Open", "High", "Low", "Close", "Volume"]
 
@@ -34,8 +37,11 @@ def _load_raw() -> dict:
 
 
 def _save_raw(data: dict) -> None:
+    """Atomic write — concurrent sessions can never leave a half-written file."""
     _CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _CACHE_FILE.write_text(json.dumps(data, indent=2))
+    tmp = _CACHE_FILE.with_suffix(f".{os.getpid()}.{threading.get_ident()}.tmp")
+    tmp.write_text(json.dumps(data, indent=2))
+    os.replace(tmp, _CACHE_FILE)
 
 
 # ── public API ─────────────────────────────────────────────────────────────────

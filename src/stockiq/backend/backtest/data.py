@@ -15,9 +15,11 @@ from pathlib import Path
 
 import pandas as pd
 
+from stockiq.backend.cache import DATA_DIR
+
 logger = logging.getLogger(__name__)
 
-DEFAULT_CACHE_DIR = Path.home() / ".stockiq" / "backtest_prices"
+DEFAULT_CACHE_DIR = DATA_DIR / "backtest_prices"
 _OHLCV = ["Open", "High", "Low", "Close", "Volume"]
 # MA200W needs ~200 weeks of history before the first scorable bar
 WARMUP_YEARS = 4.2

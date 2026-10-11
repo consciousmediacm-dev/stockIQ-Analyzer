@@ -40,6 +40,12 @@ _PCR_FETCHERS = {
 }
 
 
+def refresh_spy_data() -> int:
+    """Drop cached SPY quotes, bars, options and market snapshots. Returns caches cleared."""
+    from stockiq.backend.cache import clear_caches
+    return clear_caches("stockiq.backend.data.spy.") + clear_caches("stockiq.backend.data.market.")
+
+
 def get_spy_quote() -> dict:
     """
     Live SPY quote — fetches all configured providers in parallel, returns the freshest result.
