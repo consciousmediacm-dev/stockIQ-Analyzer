@@ -47,7 +47,6 @@ _json_ld = {
                 "RSI-14 overbought and oversold indicator",
                 "Fibonacci retracement levels",
                 "Candlestick reversal pattern detection",
-                "S&P 500 weekly and monthly candle screener",
                 "Short squeeze scanner with squeeze score",
                 "Full-market screener for every US stock and ETF",
                 "Charlie Munger quality stock watchlist",

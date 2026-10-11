@@ -542,51 +542,6 @@ def forward_pe_sector_bar(df) -> go.Figure:
     return fig
 
 
-# ── Candle Momentum Screener ──────────────────────────────────────────────────
-
-# Signal tiers share colours with the screener page; defined here so the chart
-# function is self-contained (screener keeps its own copy for UI labels).
-_CANDLE_TIER_COLORS = {
-    "🟢 Strong Buy": UP,
-    "🟢 Buy":        _LGN,
-    "🟡 Accumulate": _YEL,
-    "🟠 Caution":    _ORG,
-    "🔴 Sell":       DN,
-}
-_CANDLE_SIGNAL_TIERS = list(_CANDLE_TIER_COLORS.keys())
-
-
-def candle_momentum_sector_chart(df) -> go.Figure:
-    """Stacked bar: signal distribution per sector."""
-    sector_signal = (
-        df[df["Sector"] != "—"]
-        .groupby(["Sector", "Signal"])
-        .size()
-        .reset_index(name="Count")
-    )
-    fig = go.Figure()
-    for signal in reversed(_CANDLE_SIGNAL_TIERS):
-        sub = sector_signal[sector_signal["Signal"] == signal]
-        if sub.empty:
-            continue
-        fig.add_trace(go.Bar(
-            name=signal,
-            x=sub["Sector"],
-            y=sub["Count"],
-            marker_color=_CANDLE_TIER_COLORS[signal],
-            hovertemplate=f"<b>%{{x}}</b><br>{signal}: %{{y}}<extra></extra>",
-        ))
-    fig.update_layout(
-        barmode="stack",
-        template="plotly_dark", height=360,
-        margin=dict(l=20, r=20, t=20, b=80),
-        legend=dict(orientation="h", y=1.08, x=0),
-        xaxis=dict(title="", tickangle=-30),
-        yaxis=dict(title="# Stocks"),
-    )
-    return fig
-
-
 # ── VIX / Volatility ─────────────────────────────────────────────────────────
 
 def vix_spy_chart(df) -> go.Figure:

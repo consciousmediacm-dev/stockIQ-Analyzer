@@ -20,7 +20,6 @@ def get_pages() -> dict:
         ],
         "S&P 500 Tools": [
             st.Page(f"{_VIEWS}/analyzer.py",                   title="Stock Analyzer",  icon="🔬", url_path="analyzer"),
-            st.Page(f"{_VIEWS}/candle_momentum_screener.py",   title="Candle Screener", icon="📊", url_path="screener"),
         ],
         "Scanners": [
             st.Page(f"{_VIEWS}/market_screener.py",         title="Market Screener (all US)", icon="🗺️", url_path="market-screener"),

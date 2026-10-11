@@ -25,12 +25,10 @@ def render_about_tab() -> None:
     3. Choose which indicators to display
     4. Click **Analyze** to generate real-time technical analysis
 
-    **Screener:**
-    The **Weekly/Monthly Screener** analyzes the top 30 S&P 500 stocks and generates BUY/SELL signals
-    based on weekly and monthly candlestick patterns.
-
-    - **BUY**: All 4 recent weeks green AND at least 3 of the last 4 months green
-    - **SELL/HOLD**: All other combinations
+    **Market Screener:**
+    Filters every US-listed stock and ETF (refreshed nightly) by price, liquidity, RSI,
+    moving-average position, returns and 52-week range. Filters describe where prices sit
+    today — they are not buy or sell recommendations.
 
     All data is sourced from Yahoo Finance and updated in real-time.
     """)

@@ -1,6 +1,5 @@
 import streamlit as st
 
-from stockiq.backend.models.signals import CANDLE_SIGNALS
 from stockiq.backend.services.market_screener_service import (
     PRESETS,
     filters_from_preset,
@@ -17,7 +16,7 @@ _SORTS = {
 _COLUMNS = {
     "symbol": "Symbol", "name": "Name", "is_etf": "ETF", "exchange": "Exchange", "close": "Price",
     "chg_1d_pct": "1D %", "ret_1m_pct": "1M %", "ret_1y_pct": "1Y %", "rsi": "RSI",
-    "dist_ma200_pct": "vs MA200 %", "above_ma_count": "Above MAs (of 5)", "candle_signal": "Candles",
+    "dist_ma200_pct": "vs MA200 %", "above_ma_count": "Above MAs (of 5)",
     "pct_from_52w_high": "From 52W high %", "dollar_vol_20": "Avg $ vol (20d)",
     "link": "Analyze",
 }
@@ -63,7 +62,7 @@ def render_market_screener() -> None:
         g1, g2, g3 = st.columns(3)
         rsi_rng = g1.slider("RSI range", 0, 100, (0, 100))
         above_ma = g2.select_slider("Above how many of the 5 MAs", options=["Any", 0, 1, 2, 3, 4, 5], value="Any")
-        candles = g3.multiselect("Candle signal", [lbl for lbl, _ in CANDLE_SIGNALS])
+        ret_rng = g3.slider("1-month return (%)", -50, 50, (-50, 50))
         h1, h2, h3 = st.columns(3)
         sort_label = h1.selectbox("Sort by", ["Preset default"] + list(_SORTS))
         ascending = h2.toggle("Ascending", value=False)
@@ -74,7 +73,8 @@ def render_market_screener() -> None:
         asset_type=asset, query=query or None, min_price=min_price or None,
         min_dollar_vol=min_dvol or None, exchanges=exchanges or None,
         rsi_min=rsi_rng[0] if rsi_rng[0] > 0 else None, rsi_max=rsi_rng[1] if rsi_rng[1] < 100 else None,
-        candle_signals=candles or None, top_n=int(top_n),
+        ret_1m_min=ret_rng[0] if ret_rng[0] > -50 else None,
+        ret_1m_max=ret_rng[1] if ret_rng[1] < 50 else None, top_n=int(top_n),
     )
     if above_ma != "Any":
         extra["min_above_ma"] = extra["max_above_ma"] = int(above_ma)

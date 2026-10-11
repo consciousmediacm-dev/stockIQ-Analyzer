@@ -23,7 +23,7 @@ def render_backtest_page() -> None:
     st.markdown(
         "Replays the **retired buy/sell signal score** (removed from the Analyzer after it showed no edge) "
         "and the **price-only scanners** "
-        "(Candle Screener, the removed MA200 Bounce Radar, RSI zones) over history and measures what "
+        "(RSI zones, Buying Pressure, and the removed Candle Screener and MA200 Bounce Radar) over history and measures what "
         "happened next. Compare every row to **ALL (baseline)** — a signal is only useful "
         "if it beats doing nothing."
     )

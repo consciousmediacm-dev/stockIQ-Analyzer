@@ -1,20 +1,14 @@
-"""SPX-universe scanners: candle screener, squeeze, Munger, analyst consensus."""
+"""SPX-universe scanners: squeeze, Munger, analyst consensus, forward P/E."""
 
 import pandas as pd
 
 from stockiq.backend.data.screeners import (
-    fetch_spx_candle_momentum_scan,
     fetch_spx_forward_pe_scan,
     fetch_spx_munger_scan,
     fetch_spx_squeeze_scan,
     fetch_spx_strong_buy_scan,
     fetch_spx_strong_sell_scan,
 )
-
-
-def get_candle_momentum_scan() -> pd.DataFrame:
-    """Weekly/monthly candle screener for S&P 500. Cached 1 hour."""
-    return fetch_spx_candle_momentum_scan()
 
 
 def get_squeeze_scan(

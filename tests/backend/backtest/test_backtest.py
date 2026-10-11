@@ -203,3 +203,37 @@ def test_cli_universe_sample(monkeypatch, tmp_path):
     monkeypatch.setattr(cli, "load_prices", fake_load)
     assert cli.main(["--universe", "us_equities", "--sample", "4", "--out", str(tmp_path)]) == 1  # no data
     assert len(set(seen["tickers"]) - {"SPY"}) == 4
+
+
+# ── Buying Pressure (BX) replay matches the live panel ────────────────────────
+
+@pytest.mark.parametrize("timeframe", ["monthly", "weekly"])
+def test_bx_replay_matches_live_panel(timeframe):
+    from stockiq.backend.backtest.engine import buying_pressure_strength
+    from stockiq.backend.models.indicators import compute_buying_pressure
+
+    df = _long(21, n=1600)          # ends 2024-12-31, so every bar here is in the past
+    replay = buying_pressure_strength(df, timeframe)
+    per = "M" if timeframe == "monthly" else "W-FRI"
+    periods = df.index.to_period(per)
+    ends = [d for d, nxt in zip(df.index[:-1], periods[1:]) if d.to_period(per) != nxt]   # last day of each period
+
+    checked = 0
+    for end in ends[-40:]:
+        nxt_day = df.index[df.index.get_loc(end) + 1]
+        live = compute_buying_pressure(df.loc[:end], timeframe)
+        expected = replay.loc[nxt_day]
+        if np.isnan(expected):
+            assert live["strength"] == 0 and not live["signal"]
+            continue
+        assert live["strength"] == int(expected), f"{timeframe} bar ending {end.date()}"
+        checked += 1
+    assert checked >= 20
+
+
+def test_bx_columns_in_events(universe):
+    prices, bench = universe
+    ev = build_events(prices, bench, horizons=(20,), step=20)
+    assert set(ev["bx_weekly"]) <= {"3/3 · strong signal", "2/3 · signal", "0–1 · no signal", "n/a"}
+    result = run_backtest(prices, bench, horizons=(20,), step=20)
+    assert "Buying Pressure (BX) · monthly" in result["tables"]

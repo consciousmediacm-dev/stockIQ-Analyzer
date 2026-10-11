@@ -16,9 +16,10 @@ class ScreenFilters:
     min_dollar_vol: float = 0.0             # 20-day avg $ volume
     rsi_min: float = 0.0
     rsi_max: float = 100.0
-    candle_signals: list[str] = field(default_factory=list)
     dist_ma200_min: float | None = None
     dist_ma200_max: float | None = None
+    ret_1m_min: float | None = None
+    ret_1m_max: float | None = None
     query: str = ""                          # symbol / name contains
     sort_by: str = "dollar_vol_20"
     ascending: bool = False
@@ -31,7 +32,6 @@ PRESETS: dict[str, dict] = {
     "Below all 5 moving averages": {"_max_above_ma": 0, "sort_by": "ret_3m_pct", "ascending": True},
     "Oversold (RSI ≤ 30)":      {"rsi_max": 30, "sort_by": "rsi", "ascending": True},
     "Overbought (RSI ≥ 70)":    {"rsi_min": 70, "sort_by": "rsi"},
-    "Candle momentum: Strong Buy": {"candle_signals": ["🟢 Strong Buy"], "sort_by": "ret_1m_pct"},
     "Near 52-week high (≤ 2%)": {"sort_by": "pct_from_52w_high", "_near_high": 2.0},
     "Biggest movers today":     {"sort_by": "chg_1d_pct", "_abs_sort": True},
 }
@@ -68,8 +68,10 @@ def screen_market(df: pd.DataFrame, f: ScreenFilters, near_high: float | None = 
         m &= df["rsi"] >= f.rsi_min
     if f.rsi_max < 100:
         m &= df["rsi"] <= f.rsi_max
-    if f.candle_signals:
-        m &= df["candle_signal"].isin(f.candle_signals)
+    if f.ret_1m_min is not None:
+        m &= df["ret_1m_pct"] >= f.ret_1m_min
+    if f.ret_1m_max is not None:
+        m &= df["ret_1m_pct"] <= f.ret_1m_max
     if f.dist_ma200_min is not None:
         m &= df["dist_ma200_pct"] >= f.dist_ma200_min
     if f.dist_ma200_max is not None:
