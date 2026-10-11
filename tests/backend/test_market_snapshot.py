@@ -126,6 +126,10 @@ def test_screen_filters(snap_df):
     assert out["rsi"].is_monotonic_increasing and (out["rsi"] <= 60).all()
     assert list(screen_market(snap_df, ScreenFilters(query="co 3"))["symbol"]) == ["S3"]
     assert len(screen_market(snap_df, ScreenFilters(top_n=2))) == 2
+    mid = snap_df["ret_1m_pct"].median()
+    out = screen_market(snap_df, ScreenFilters(ret_1m_min=mid))
+    assert 0 < len(out) < len(snap_df) and (out["ret_1m_pct"] >= mid).all()
+    assert (screen_market(snap_df, ScreenFilters(ret_1m_max=mid))["ret_1m_pct"] <= mid).all()
     assert screen_market(pd.DataFrame(), ScreenFilters()).empty
 
 

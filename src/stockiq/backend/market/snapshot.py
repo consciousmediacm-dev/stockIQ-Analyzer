@@ -4,7 +4,7 @@ Full-market snapshot: one row of indicators per US-listed stock and ETF.
 Built nightly by cache/scripts/build_market_snapshot.py (GitHub Actions) and
 published as a Release asset; the app loads it via data/market_snapshot.py and
 the Market Screener filters it. Every indicator uses the same functions as the
-live pages (moving averages, RSI, candle tiers), so a symbol reads the same
+live pages (moving averages, RSI), so a symbol reads the same
 here as in the Stock Analyzer.
 """
 
@@ -16,7 +16,6 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 
-from stockiq.backend.backtest.engine import _candle_label, candle_counts
 from stockiq.backend.backtest.signals_vec import add_indicators
 
 logger = logging.getLogger(__name__)
@@ -31,7 +30,7 @@ SNAPSHOT_COLUMNS = [
     "close", "chg_1d_pct", "ret_1w_pct", "ret_1m_pct", "ret_3m_pct", "ret_1y_pct",
     "volume", "avg_vol_20", "dollar_vol_20", "high_52w", "low_52w", "pct_from_52w_high",
     "ma20", "ma50", "ma200", "ma200w", "dist_ma50_pct", "dist_ma200_pct", "dist_ma200w_pct", "rsi",
-    "above_ma_count", "weekly_green", "monthly_green", "candle_signal", "gap_pct",
+    "above_ma_count", "gap_pct",
 ]
 
 
@@ -62,7 +61,6 @@ def snapshot_row(symbol: str, ohlcv: pd.DataFrame, meta: dict | None = None,
         return None
 
     ind = add_indicators(df)
-    candles = candle_counts(df)
     last = ind.iloc[-1]
     close = df["Close"]
     vol = df["Volume"] if "Volume" in df.columns else pd.Series(0.0, index=df.index)
@@ -79,7 +77,6 @@ def snapshot_row(symbol: str, ohlcv: pd.DataFrame, meta: dict | None = None,
     above_ma = sum(1 for m in mas if not pd.isna(m) and float(last["Close"]) > float(m))
 
     prev_close = float(close.iloc[-2]) if len(close) > 1 else None
-    wg, mg = candles["weekly_green"].iloc[-1], candles["monthly_green"].iloc[-1]
     meta = meta or {}
     return {
         "symbol":            symbol,
@@ -109,9 +106,6 @@ def snapshot_row(symbol: str, ohlcv: pd.DataFrame, meta: dict | None = None,
         "dist_ma200w_pct":   _num((float(last["Close"]) / ma200w - 1) * 100) if ma200w else None,
         "rsi":               rsi,
         "above_ma_count":    above_ma,
-        "weekly_green":      None if pd.isna(wg) else int(wg),
-        "monthly_green":     None if pd.isna(mg) else int(mg),
-        "candle_signal":     None if pd.isna(mg) else str(_candle_label(pd.Series([wg]), pd.Series([mg]))[0]),
         "gap_pct":           _num((float(df["Open"].iloc[-1]) / prev_close - 1) * 100) if prev_close else None,
     }
 
