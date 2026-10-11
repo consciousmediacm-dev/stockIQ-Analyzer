@@ -61,6 +61,7 @@ class TestFetchOHLCV:
         )
         mock_download.return_value = multi_df
         result = fetch_ohlcv("AAPL", 30)
+        assert not result.empty
         assert not isinstance(result.columns, pd.MultiIndex)
 
     @patch("stockiq.backend.data.yf_fetch.yf.download")
@@ -88,8 +89,16 @@ class TestFetchOHLCV:
     def test_ticker_passed_to_yfinance(self, mock_download):
         mock_download.return_value = _make_yf_df(100)
         fetch_ohlcv("MSFT", 365)
-        called_ticker = mock_download.call_args[0][0]
-        assert called_ticker == "MSFT"
+        called_tickers = mock_download.call_args[0][0]
+        assert called_tickers == ["MSFT"]
+
+    @patch("stockiq.backend.data.yf_fetch.yf.download")
+    def test_end_date_is_inclusive_of_today(self, mock_download):
+        """yfinance's `end` is exclusive, so we must pass tomorrow to include today's bar."""
+        from datetime import date, timedelta
+        mock_download.return_value = _make_yf_df(100)
+        fetch_ohlcv("MSFT", 365)
+        assert mock_download.call_args.kwargs["end"] == (date.today() + timedelta(days=1)).isoformat()
 
 
 # ── get_company_name ──────────────────────────────────────────────────────────

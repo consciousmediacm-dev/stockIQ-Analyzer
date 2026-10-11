@@ -16,6 +16,7 @@ Exports:
   SCREENER_TICKER_COUNT    — how many SPX tickers to scan (env-overridable)
   QUOTE_SPY_PROVIDERS      — ordered list of quote providers for SPY live price
   OPTIONS_SPY_PROVIDERS    — ordered list of options data providers for SPY
+  HISTORY_PROVIDERS        — ordered list of daily-history providers (failover order)
 """
 
 import os
@@ -32,6 +33,7 @@ with open(_backend_dir / "app.yml") as _f:
 
 QUOTE_SPY_PROVIDERS:   list[str] = _app["quote"]["spy_providers"]
 OPTIONS_SPY_PROVIDERS: list[str] = _app["options"]["spy_providers"]
+HISTORY_PROVIDERS:     list[str] = _app.get("history", {}).get("providers", ["yahoo"])
 
 # ── Cache TTLs (backend-only) ──────────────────────────────────────────────────
 with open(_backend_dir / "cache.yml") as _f:

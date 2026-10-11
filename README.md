@@ -112,6 +112,20 @@ OPENAI_API_KEY    = "sk-proj-..."    # platform.openai.com/api-keys
 ANTHROPIC_API_KEY = "sk-ant-..."     # console.anthropic.com/settings/keys
 ```
 
+Market data — Yahoo Finance is used by default (free, no key). Add Alpha Vantage as an
+automatic fallback (and for the all-US universe) with:
+
+```toml
+ALPHA_VANTAGE_API_KEY = "..."        # alphavantage.co/support/#api-key
+ALPHA_VANTAGE_PREMIUM = "true"       # paid plan: split-adjusted history + higher rate limits
+```
+
+The free Alpha Vantage tier is 25 requests/day and returns *unadjusted* prices, so it is only
+a last-resort fallback; a premium key is needed for real use. Provider order lives in
+`src/stockiq/backend/config/app.yml` (`history.providers`). Every response is validated
+(duplicates, bad prices, High/Low repairs, split-like jumps) and tickers one provider can't
+serve fall through to the next.
+
 Or set keys as environment variables:
 
 ```bash

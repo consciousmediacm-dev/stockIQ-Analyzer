@@ -2,6 +2,7 @@
 
 import logging
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import requests
@@ -34,6 +35,19 @@ def _pcr_signal(ratio: float) -> tuple[str, str]:
     if ratio > 0.6:
         return "Complacent — mild bearish lean",     "#F59E0B"
     return "Extreme Greed — contrarian bearish",     "#EF4444"
+
+
+def _cboe_ts(ts_str: str) -> int:
+    """
+    CBOE's last_trade_time is US/Eastern wall-clock time with no offset. Parsing it
+    as naive local time made it look hours stale on UTC servers, so the "freshest
+    quote wins" comparison in get_spy_quote() always picked Yahoo.
+    """
+    try:
+        naive = datetime.strptime(ts_str, "%Y-%m-%dT%H:%M:%S")
+    except (TypeError, ValueError):
+        return 0
+    return int(naive.replace(tzinfo=ZoneInfo("America/New_York")).timestamp())
 
 
 # ── Quote & price history ──────────────────────────────────────────────────────
@@ -75,11 +89,7 @@ def fetch_spx_quote_cboe() -> dict:
         prev  = float(d.get("prev_day_close") or 0)
         if not price:
             return {}
-        ts_str = d.get("last_trade_time") or ""
-        try:
-            ts = int(datetime.strptime(ts_str, "%Y-%m-%dT%H:%M:%S").timestamp())
-        except Exception:
-            ts = 0
+        ts = _cboe_ts(d.get("last_trade_time") or "")
         return {
             "price":      price,
             "prev_close": prev,
@@ -94,6 +104,20 @@ def fetch_spx_quote_cboe() -> dict:
             "_ts":        ts,
         }
     except Exception:
+        return {}
+
+
+@ttl_cache(CACHE_TTL["fetch_spx_quote_cboe"])
+def fetch_spx_quote_alphavantage() -> dict:
+    """SPY quote from Alpha Vantage GLOBAL_QUOTE (needs ALPHA_VANTAGE_API_KEY). Returns {} on error."""
+    from stockiq.backend.data.providers import get_provider
+    provider = get_provider("alphavantage")
+    if not provider.is_configured():
+        return {}
+    try:
+        return provider.quote("SPY")
+    except Exception as exc:
+        logging.getLogger(__name__).warning("alphavantage quote failed: %s", exc)
         return {}
 
 

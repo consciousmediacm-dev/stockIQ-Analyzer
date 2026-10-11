@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from stockiq.backend.backtest.data import load_prices_yf
+from stockiq.backend.backtest.data import load_prices
 from stockiq.backend.backtest.engine import run_backtest
 from stockiq.backend.backtest.report import render_markdown
 from stockiq.backend.cache import ttl_cache
@@ -10,7 +10,7 @@ from stockiq.backend.cache import ttl_cache
 
 @ttl_cache(6 * 3600)
 def _load(tickers: tuple[str, ...], years: float) -> dict[str, pd.DataFrame]:
-    return load_prices_yf(list(tickers), years)
+    return load_prices(list(tickers), years)
 
 
 def run_signal_backtest(

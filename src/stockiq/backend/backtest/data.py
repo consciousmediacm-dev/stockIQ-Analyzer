@@ -2,8 +2,8 @@
 Price loading for backtests.
 
 Sources:
-  • yfinance batch download (default) with a per-ticker parquet cache so repeat
-    runs don't re-download 10+ years of history.
+  • The provider chain (Yahoo → Alpha Vantage, see data/providers) with a
+    per-ticker parquet cache so repeat runs don't re-download 10+ years of history.
   • A directory of CSV files (TICKER.csv with Date, Open, High, Low, Close, Volume)
     — useful when the data comes from a paid vendor export.
 """
@@ -45,22 +45,19 @@ def load_prices_csv(directory: str | Path, tickers: list[str] | None = None) -> 
     return out
 
 
-def load_prices_yf(
+def load_prices(
     tickers: list[str],
     years: float,
     cache_dir: Path | None = DEFAULT_CACHE_DIR,
     max_cache_age_hours: float = 20,
-    chunk_size: int = 50,
 ) -> dict[str, pd.DataFrame]:
     """
-    Download `years` + warm-up of daily adjusted OHLCV for each ticker.
-    Fresh cached parquet files are reused; missing ones are batch-downloaded.
+    `years` + warm-up of daily adjusted OHLCV per ticker via the provider chain
+    (Yahoo → Alpha Vantage, validated). Fresh cached parquet files are reused.
     """
-    import yfinance as yf
+    from stockiq.backend.data.providers import get_daily_history
 
-    start = (datetime.today() - timedelta(days=int((years + WARMUP_YEARS) * 365.25))).strftime("%Y-%m-%d")
-    # yfinance treats `end` as exclusive — use tomorrow so today's bar is included
-    end = (datetime.today() + timedelta(days=1)).strftime("%Y-%m-%d")
+    start = (datetime.today() - timedelta(days=int((years + WARMUP_YEARS) * 365.25))).date()
 
     out: dict[str, pd.DataFrame] = {}
     todo: list[str] = []
@@ -73,28 +70,20 @@ def load_prices_yf(
                 continue
         todo.append(t)
 
-    for i in range(0, len(todo), chunk_size):
-        chunk = todo[i:i + chunk_size]
-        logger.info("Downloading %d tickers (%d/%d)", len(chunk), i + len(chunk), len(todo))
-        try:
-            raw = yf.download(
-                chunk, start=start, end=end, progress=False,
-                auto_adjust=True, group_by="ticker", threads=True,
-            )
-        except Exception as exc:  # network / rate-limit — skip the chunk, keep going
-            logger.warning("Download failed for chunk starting %s: %s", chunk[0], exc)
-            continue
-        for t in chunk:
-            try:
-                df = raw[t] if isinstance(raw.columns, pd.MultiIndex) else raw
-                df = _clean(df.copy())
-            except KeyError:
-                df = pd.DataFrame()
-            if df.empty:
-                logger.warning("No data for %s", t)
-                continue
+    if todo:
+        logger.info("Downloading history for %d tickers", len(todo))
+        fetched = get_daily_history(todo, start, datetime.today().date())
+        for t, df in fetched.items():
+            df = _clean(df)
             out[t] = df
             if cache_dir:
                 cache_dir.mkdir(parents=True, exist_ok=True)
                 df.to_parquet(cache_dir / f"{t}.parquet")
+        missing = set(todo) - set(fetched)
+        if missing:
+            logger.warning("No data for %d tickers: %s", len(missing), sorted(missing)[:20])
     return out
+
+
+# Backwards-compatible name
+load_prices_yf = load_prices

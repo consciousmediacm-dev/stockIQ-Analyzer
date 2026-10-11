@@ -27,22 +27,16 @@ def search_companies(query: str) -> list[dict]:
 
 def fetch_ohlcv(ticker: str, period_days: int) -> pd.DataFrame:
     """
-    Download OHLCV history for a single ticker.
+    Daily adjusted OHLCV history for a single ticker, through today (inclusive).
     Fetches extra history (period_days + 1450) so long-period MAs have enough warmup data.
-    Returns a clean DataFrame or raises on failure.
+    Served by the provider chain (Yahoo → Alpha Vantage) with validation; returns an
+    empty DataFrame when no provider has data.
     """
-    end_date   = datetime.today()
-    start_date = end_date - timedelta(days=period_days + 1450)
-    df = yf.download(
-        ticker,
-        start=start_date.strftime("%Y-%m-%d"),
-        end=end_date.strftime("%Y-%m-%d"),
-        progress=False,
-        auto_adjust=True,
-    )
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-    return df.dropna(subset=["Close"])
+    from stockiq.backend.data.providers import get_daily_history
+
+    start = (datetime.today() - timedelta(days=period_days + 1450)).date()
+    data = get_daily_history([ticker], start, datetime.today().date())
+    return data.get(ticker, pd.DataFrame())
 
 
 def get_company_name(ticker: str) -> str:

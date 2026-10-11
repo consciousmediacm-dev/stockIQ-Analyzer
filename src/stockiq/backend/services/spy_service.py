@@ -9,6 +9,7 @@ from stockiq.backend.data.spy import (
     fetch_put_call_ratio_cboe,
     fetch_spx_intraday,
     fetch_spx_quote,
+    fetch_spx_quote_alphavantage,
     fetch_spx_quote_cboe,
     fetch_spy_options_data,
     fetch_spy_options_data_cboe,
@@ -25,8 +26,9 @@ from stockiq.backend.models.options import (
 )
 
 _QUOTE_FETCHERS = {
-    "yahoo": fetch_spx_quote,
-    "cboe":  fetch_spx_quote_cboe,
+    "yahoo":        fetch_spx_quote,
+    "cboe":         fetch_spx_quote_cboe,
+    "alphavantage": fetch_spx_quote_alphavantage,
 }
 _OPTIONS_CHAIN_FETCHERS = {
     "yahoo": fetch_spy_options_data,

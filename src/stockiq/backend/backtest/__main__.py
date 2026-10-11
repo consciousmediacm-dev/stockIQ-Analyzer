@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from stockiq.backend.backtest.data import WARMUP_YEARS, load_prices_csv, load_prices_yf
+from stockiq.backend.backtest.data import WARMUP_YEARS, load_prices_csv, load_prices
 from stockiq.backend.backtest.engine import DEFAULT_HORIZONS, run_backtest
 from stockiq.backend.backtest.report import write_report
 
@@ -43,7 +43,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.csv_dir:
         prices = load_prices_csv(args.csv_dir, wanted)
     else:
-        prices = load_prices_yf(wanted, args.years)
+        prices = load_prices(wanted, args.years)
 
     bench = prices.get(args.benchmark)
     universe = {t: df for t, df in prices.items() if t in tickers}

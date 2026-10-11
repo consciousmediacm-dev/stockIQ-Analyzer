@@ -63,6 +63,23 @@ python3 scripts/build_analyst_consensus_cache.py
 
 ---
 
+### `build_universe_cache.py`
+Builds the list of every active US-listed stock and ETF (~10k symbols) from the
+free nasdaqtrader.com symbol directory, falling back to Alpha Vantage
+`LISTING_STATUS`. Warrants, units, rights, preferreds and test issues are excluded.
+Refuses to write if fewer than 3,000 symbols come back.
+
+**When to run:** Weekly (new listings / delistings).
+
+```bash
+python3 cache/scripts/build_universe_cache.py
+```
+
+Use it in code with `stockiq.backend.data.universe.get_universe("us_equities")`
+(also `us_etfs`, `us_all`, `sp500`, `nasdaq100`).
+
+---
+
 ## Refresh Schedule Summary
 
 | Script                          | GCS path                          | Refresh cadence |
@@ -71,3 +88,4 @@ python3 scripts/build_analyst_consensus_cache.py
 | `build_fundamentals_cache.py`   | `screener/fundamentals.json`      | Quarterly       |
 | `build_short_interest_cache.py` | `screener/short_interest.json`    | Monthly         |
 | `build_analyst_consensus_cache.py` | `screener/analyst_consensus.json` | Weekly       |
+| `build_universe_cache.py`       | `screener/universe.json`          | Weekly          |
