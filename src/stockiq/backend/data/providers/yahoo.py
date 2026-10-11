@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 class YahooProvider:
     name = "yahoo"
+    probe_symbol = "SPY"   # see providers.__init__ circuit breaker
 
     def __init__(self, chunk_size: int = 100) -> None:
         self.chunk_size = chunk_size

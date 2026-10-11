@@ -1,0 +1,16 @@
+# Exact versions the test suite was last verified against (Python 3.11–3.13).
+# CI installs with `pip install -c constraints.txt -e .` so a new upstream release
+# can't break the build without a deliberate bump here.
+anthropic==1.13.0
+google-genai==2.29.0
+groq==1.7.0
+numpy==2.5.3
+pandas==3.0.5
+plotly==7.1.0
+pyarrow==23.0.1
+python-dotenv==1.2.3
+PyYAML==6.0.1
+requests==2.34.2
+streamlit==1.65.0
+tabulate==0.10.0
+yfinance==1.7.0

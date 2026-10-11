@@ -4,22 +4,32 @@ on:
   schedule:
     # Mon–Sat 02:00 UTC: fast scripts (analyst, forward_pe, short_interest)
     - cron: "0 2 * * 1-6"
-    # Sunday 02:00 UTC: all scripts including quarterly (metadata + fundamentals)
+    # Sunday 02:00 UTC: all scripts including quarterly (metadata + fundamentals) and the universe
     - cron: "0 2 * * 0"
   workflow_dispatch:
     inputs:
       full_refresh:
-        description: "Run all scripts including quarterly (metadata + fundamentals)"
+        description: "Run all scripts including quarterly (metadata + fundamentals) and the universe"
         type: boolean
         default: false
 
 permissions:
   contents: write
 
+# Never let two refreshes race on the same files
+concurrency:
+  group: refresh-screener-cache
+  cancel-in-progress: false
+
 jobs:
   refresh-cache:
     name: Refresh screener cache
     runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      FULL: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.full_refresh == 'true') || github.event.schedule == '0 2 * * 0' }}
+      ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+      ALPHA_VANTAGE_PREMIUM: ${{ vars.ALPHA_VANTAGE_PREMIUM }}
 
     steps:
       - name: Checkout main
@@ -37,35 +47,50 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip setuptools
-          pip install -e .
+          pip install -e . pytest
 
-      # ── Daily: analyst consensus (weekly cadence is fine nightly) ──────────
+      # Each build step refuses to overwrite its file when coverage drops below 90%
+      # (cache/scripts/_common.py) and exits non-zero. continue-on-error keeps the
+      # other sources refreshing; the "Fail if any source failed" step below still
+      # marks the run red so GitHub notifies you.
+
       - name: Build analyst consensus cache
+        id: analyst
+        continue-on-error: true
         run: python cache/scripts/build_analyst_consensus_cache.py
 
-      # ── Daily: forward P/E ─────────────────────────────────────────────────
       - name: Build forward P/E cache
+        id: forward_pe
+        continue-on-error: true
         run: python cache/scripts/build_forward_pe_cache.py
 
-      # ── Daily: short interest (monthly data, safe to re-fetch nightly) ─────
       - name: Build short interest cache
+        id: short_interest
+        continue-on-error: true
         run: python cache/scripts/build_short_interest_cache.py
 
-      # ── Sunday + manual full_refresh: metadata (quarterly data) ───────────
       - name: Build ticker metadata cache
-        if: |
-          github.event_name == 'workflow_dispatch' && github.event.inputs.full_refresh == 'true'
-          || github.event.schedule == '0 2 * * 0'
+        id: metadata
+        if: env.FULL == 'true'
+        continue-on-error: true
         run: python cache/scripts/build_metadata_cache.py
 
-      # ── Sunday + manual full_refresh: fundamentals (quarterly data) ────────
       - name: Build fundamentals cache
-        if: |
-          github.event_name == 'workflow_dispatch' && github.event.inputs.full_refresh == 'true'
-          || github.event.schedule == '0 2 * * 0'
+        id: fundamentals
+        if: env.FULL == 'true'
+        continue-on-error: true
         run: python cache/scripts/build_fundamentals_cache.py
 
-      # ── Commit & push updated JSON files to main ───────────────────────────
+      - name: Build all-US universe
+        id: universe
+        if: env.FULL == 'true'
+        continue-on-error: true
+        run: python cache/scripts/build_universe_cache.py
+
+      - name: Validate cache files
+        run: pytest tests/data/test_cache_files.py -q
+
+      # ── Commit & push whatever passed the gate ─────────────────────────────
       - name: Commit and push cache files
         run: |
           git config user.name  "github-actions[bot]"
@@ -74,6 +99,15 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit — cache is already up to date."
           else
-            git commit -m "chore: nightly screener cache refresh [$(date -u '+%Y-%m-%d')]"
+            git commit -m "chore: nightly screener cache refresh [$(date -u '+%Y-%m-%d')] [skip ci]"
             git push origin main
           fi
+
+      - name: Fail if any source failed
+        if: >-
+          steps.analyst.outcome == 'failure' || steps.forward_pe.outcome == 'failure' ||
+          steps.short_interest.outcome == 'failure' || steps.metadata.outcome == 'failure' ||
+          steps.fundamentals.outcome == 'failure' || steps.universe.outcome == 'failure'
+        run: |
+          echo "::error::One or more cache sources failed or were refused by the coverage gate — see the step logs above."
+          exit 1

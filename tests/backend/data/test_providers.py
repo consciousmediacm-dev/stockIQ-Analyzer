@@ -114,6 +114,7 @@ def fake_chain(monkeypatch):
         monkeypatch.setattr(providers, "_instances", {f.name: f for f in fakes})
         monkeypatch.setattr(providers, "_FACTORIES", {f.name: type(f) for f in fakes})
         monkeypatch.setattr(providers, "_status", {})
+        monkeypatch.setattr(providers, "_down_until", {})
         return [f.name for f in fakes]
     return install
 
@@ -137,7 +138,8 @@ def test_failover_on_provider_error_and_skips_unconfigured(fake_chain):
     assert "AAA" in out
     assert b.requested == []
     status = providers._status
-    assert status["a"].failures == 1 and status["c"].tickers_served == 1
+    assert status["a"].failures >= 1 and status["c"].tickers_served == 1
+    assert providers._is_down("a")          # hard failure opens the breaker
 
 
 def test_unusable_data_falls_through(fake_chain):
@@ -262,3 +264,29 @@ def test_validate_does_not_flag_normal_volatility():
     df = _bars(20)
     df.loc[df.index[10]:, ["Open", "High", "Low", "Close"]] *= 0.8   # −20% day: real, not a split
     assert not any("split" in i for i in validate_ohlcv(df, "X").issues)
+
+
+# ── circuit breaker ───────────────────────────────────────────────────────────
+
+def test_breaker_skips_provider_after_empty_batch(fake_chain, monkeypatch):
+    monkeypatch.setattr(providers, "_down_until", {})
+    a = _Fake("a", {})                       # reachable but returns nothing (yfinance offline)
+    b = _Fake("b", {f"T{i}": _bars() for i in range(6)})
+    order = fake_chain(a, b)
+    tickers = [f"T{i}" for i in range(6)]
+    assert len(providers.get_daily_history(tickers, date(2026, 1, 1), providers=order)) == 6
+    assert len(a.requested) == 1
+    providers.get_daily_history(tickers, date(2026, 1, 1), providers=order)
+    assert len(a.requested) == 1            # skipped while the breaker is open
+    assert providers.provider_status()["a"]["failures"] >= 1
+
+
+def test_large_batches_probe_first(fake_chain, monkeypatch):
+    monkeypatch.setattr(providers, "_down_until", {})
+    a = _Fake("a", {})
+    a.probe_symbol = "SPY"
+    b = _Fake("b", {f"T{i}": _bars() for i in range(30)})
+    order = fake_chain(a, b)
+    out = providers.get_daily_history([f"T{i}" for i in range(30)], date(2026, 1, 1), providers=order)
+    assert len(out) == 30
+    assert a.requested == [["SPY"]]          # only the probe hit the dead provider

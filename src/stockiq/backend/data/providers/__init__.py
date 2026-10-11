@@ -17,7 +17,7 @@ import logging
 import threading
 import time
 from dataclasses import asdict, dataclass, field
-from datetime import date
+from datetime import date, timedelta
 
 import pandas as pd
 
@@ -62,6 +62,36 @@ class _Status:
 _status: dict[str, _Status] = {}
 _status_lock = threading.Lock()
 
+# ── Circuit breaker ───────────────────────────────────────────────────────────
+# yfinance doesn't raise when Yahoo is unreachable — it fails each ticker in turn
+# (~0.3 s apiece), so a 300-ticker scan would hang ~90 s per page view during an
+# outage. Providers that set `probe_symbol` are probed with one cheap request
+# before large batches; a failed probe or an all-empty batch marks the provider
+# down for BREAKER_SECONDS and requests go straight to the next provider.
+BREAKER_SECONDS = 60
+PROBE_THRESHOLD = 20      # batches larger than this are probed first
+_down_until: dict[str, float] = {}
+
+
+def _is_down(name: str) -> bool:
+    return _down_until.get(name, 0.0) > time.time()
+
+
+def _trip(name: str, reason: str) -> None:
+    _down_until[name] = time.time() + BREAKER_SECONDS
+    logger.warning("%s marked down for %ds: %s", name, BREAKER_SECONDS, reason)
+    _record(name, error=f"circuit open: {reason}")
+
+
+def _probe_ok(provider: HistoryProvider) -> bool:
+    symbol = getattr(provider, "probe_symbol", None)
+    if not symbol:
+        return True
+    try:
+        return bool(provider.daily_history([symbol], date.today() - timedelta(days=10), date.today()))
+    except ProviderError:
+        return False
+
 
 def get_provider(name: str) -> HistoryProvider:
     if name not in _instances:
@@ -87,6 +117,9 @@ def provider_status() -> dict[str, dict]:
     """Snapshot of per-provider health for the status page."""
     with _status_lock:
         out = {name: asdict(s) for name, s in _status.items()}
+    for name, until in _down_until.items():
+        if until > time.time() and name in out:
+            out[name]["down_until"] = until
     for name in HISTORY_PROVIDERS:
         if name in _FACTORIES:
             out.setdefault(name, asdict(_Status()))
@@ -116,7 +149,10 @@ def get_daily_history(
             logger.warning("Unknown history provider %r in config", name)
             continue
         provider = get_provider(name)
-        if not provider.is_configured():
+        if not provider.is_configured() or _is_down(name):
+            continue
+        if len(remaining) > PROBE_THRESHOLD and not _probe_ok(provider):
+            _trip(name, f"probe {getattr(provider, 'probe_symbol', '')} returned no data")
             continue
         try:
             got = with_retry(
@@ -126,6 +162,11 @@ def get_daily_history(
         except ProviderError as exc:
             logger.warning("%s history failed for %d tickers: %s", name, len(remaining), exc)
             _record(name, error=str(exc))
+            if not isinstance(exc, RateLimitError):
+                _trip(name, str(exc)[:120])
+            continue
+        if not got and len(remaining) >= 5:
+            _trip(name, f"returned nothing for {len(remaining)} tickers")
             continue
 
         issues: list[str] = []

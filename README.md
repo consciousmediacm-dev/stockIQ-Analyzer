@@ -1,6 +1,6 @@
 # StockIQ — Free S&P 500 Technical Analysis & Screener
 
-[![CI](https://github.com/Mamun/stockiq/actions/workflows/ci.yml/badge.svg)](https://github.com/Mamun/stockiq/actions/workflows/ci.yml)
+[![CI](https://github.com/consciousmediacm-dev/stockIQ-Analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/consciousmediacm-dev/stockIQ-Analyzer/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org)
 [![Streamlit](https://img.shields.io/badge/built%20with-Streamlit-FF4B4B)](https://streamlit.io)
@@ -89,8 +89,8 @@ Curated ETF categories — Retail Favorites, Semiconductors, Software — ranked
 ### Installation
 
 ```bash
-git clone https://github.com/Mamun/stockiq.git
-cd stockiq
+git clone https://github.com/consciousmediacm-dev/stockIQ-Analyzer.git
+cd stockIQ-Analyzer
 
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
@@ -140,6 +140,33 @@ streamlit run app.py
 
 Open [http://localhost:8501](http://localhost:8501) in your browser.
 
+### Docker
+
+```bash
+cp .env.example .env          # add whichever keys you have
+docker compose up --build     # → http://localhost:8501
+```
+
+The compose file mounts a volume at `/data` and uses the SQLite cache, so caches, the
+AI forecast track record and backtest prices survive restarts.
+
+### Environment variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `ALPHA_VANTAGE_API_KEY` | — | Market-data failover + all-US ticker universe |
+| `ALPHA_VANTAGE_PREMIUM` | `false` | `true` on a paid plan: adjusted history, higher rate limits |
+| `GROQ_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` | — | AI Outlook providers |
+| `STOCKIQ_MODEL_<PROVIDER>` | see `llm/providers.py` | Override a provider's model ID |
+| `STOCKIQ_DATA_DIR` | `~/.stockiq` | Caches, forecast log, backtest prices |
+| `STOCKIQ_CACHE_BACKEND` | `memory` | `sqlite` to keep caches across restarts |
+| `STOCKIQ_LOG_LEVEL` | `INFO` | Log verbosity |
+| `SCREENER_TICKER_COUNT` | `300` | Scan fewer tickers while developing |
+
+Templates: `.env.example` (local / Docker) and `.streamlit/secrets.toml.example` (Streamlit Cloud).
+**Info → System Status** in the app shows which keys are set, provider health, cache ages and
+recent warnings.
+
 ### Optional: limit screener scope
 
 The weekly/monthly screener scans the top 50 S&P 500 tickers by default. To speed up development:
@@ -179,10 +206,12 @@ Fundamentals-based scanners are not backtested because only a current snapshot i
 pip install pytest pytest-cov
 pytest                                    # all tests
 pytest --cov=. --cov-report=term-missing  # with coverage
-pytest tests/test_indicators.py -v        # single file
+pytest tests/backend/models/test_indicators.py -v   # single file
 ```
 
-Tests are network-free — all `yfinance` calls are mocked.
+Tests are network-free — data calls are mocked, and `tests/frontend/test_pages_smoke.py`
+renders every page with sockets blocked to prove each one degrades gracefully when data
+sources are down.
 
 ---
 
@@ -201,7 +230,10 @@ Tests are network-free — all `yfinance` calls are mocked.
     ├── backend/
     │   ├── config/                 # Backend-only config (app.yml, cache.yml, TTLs, provider order)
     │   ├── models/                 # Pure data models (indicators, signals, options, spy context)
+    │   ├── backtest/               # Signal backtesting engine + CLI (python -m stockiq.backend.backtest)
     │   ├── data/
+    │   │   ├── providers/          # Market-data providers (Yahoo, Alpha Vantage), failover, validation
+    │   │   ├── universe.py         # Ticker universes (S&P, NASDAQ-100, all US stocks/ETFs)
     │   │   ├── spy.py              # SPY price, intraday bars, options chain, put/call ratio (Yahoo + CBOE)
     │   │   ├── market.py           # VIX/index snapshot helpers (TTL-cached)
     │   │   ├── yf_fetch.py         # yfinance OHLCV download & company search
@@ -215,8 +247,8 @@ Tests are network-free — all `yfinance` calls are mocked.
     │   │   ├── ai_forecast_service.py  # Multi-provider AI forecast composition
     │   │   ├── analyzer_service.py # Per-ticker technical analysis pipeline
     │   │   └── scanners/           # Scanner services (NASDAQ, SPX, ETF, pre-market)
-    │   ├── llm/                    # Multi-provider LLM wrappers (Groq, Gemini, DeepSeek, OpenAI, Anthropic)
-    │   └── cache.py                # TTL cache decorator
+    │   ├── llm/                    # LLM providers, forecast validation + retry, track record
+    │   └── cache.py                # TTL cache (thread-safe memory / SQLite backends)
     └── frontend/
         └── views/                  # Streamlit page modules (one file per page)
             └── components/         # Reusable UI components (charts, gap table, summary card)
@@ -262,7 +294,7 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before
 4. Run `pytest` and `ruff check .`
 5. Open a Pull Request
 
-See [good first issues](https://github.com/Mamun/stockiq/labels/good%20first%20issue) for a place to start.
+See [good first issues](https://github.com/consciousmediacm-dev/stockIQ-Analyzer/labels/good%20first%20issue) for a place to start.
 
 ---
 

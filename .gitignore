@@ -16,3 +16,6 @@ venv/
 *.json
 !cache/screener/*.json
 reports/
+
+# Build artifacts
+*.egg-info/
