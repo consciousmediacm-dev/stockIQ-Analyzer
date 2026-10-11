@@ -1,15 +1,26 @@
-"""Multi-provider LLM wrappers and in-process forecast cache."""
+"""Multi-provider LLM wrappers, forecast validation/retry, and in-process forecast cache."""
 
 import hashlib
+import json
+import logging
 import os
 
 import requests as _requests
 
 from stockiq.backend.cache import MemoryCache
 from stockiq.backend.config import CACHE_TTL
-from stockiq.backend.llm.prompts import _SYSTEM, _USER_TMPL, _parse_json
+from stockiq.backend.llm.prompts import _SYSTEM, _USER_TMPL, retry_message
+from stockiq.backend.llm.track_record import log_forecast
+from stockiq.backend.llm.validation import (
+    FORECAST_SCHEMA,
+    ForecastValidationError,
+    parse_forecast,
+    validate_forecast,
+)
 
+logger = logging.getLogger(__name__)
 
+# Model IDs can be overridden without a code change: STOCKIQ_MODEL_<PROVIDER>=...
 PROVIDERS: dict[str, dict] = {
     "groq": {
         "label":   "Llama 3.3 70B (Groq)",
@@ -25,7 +36,7 @@ PROVIDERS: dict[str, dict] = {
     },
     "gemini": {
         "label":   "Gemini 2.5 Flash (Google)",
-        "model":   "gemini-2.5-flash-preview-04-17",
+        "model":   "gemini-2.5-flash",
         "env_var": "GOOGLE_API_KEY",
         "free":    True,
     },
@@ -36,8 +47,8 @@ PROVIDERS: dict[str, dict] = {
         "free":    False,
     },
     "anthropic": {
-        "label":   "Claude (Anthropic)",
-        "model":   "claude-opus-4-6",
+        "label":   "Claude Opus 5.5 (Anthropic)",
+        "model":   "claude-opus-5-5",
         "env_var": "ANTHROPIC_API_KEY",
         "free":    False,
     },
@@ -48,107 +59,134 @@ def get_secret(key: str) -> str:
     return os.environ.get(key, "")
 
 
-def _call_anthropic(context_json: str, user_key: str = "") -> list[dict]:
+def model_for(provider: str) -> str:
+    return os.environ.get(f"STOCKIQ_MODEL_{provider.upper()}") or PROVIDERS[provider]["model"]
+
+
+# ── Provider calls: (system, user message, api key) → raw text ────────────────
+
+def _complete_anthropic(system: str, user: str, api_key: str) -> str:
     import anthropic
-    api_key = user_key or get_secret("ANTHROPIC_API_KEY")
-    if not api_key:
-        return []
+
     client = anthropic.Anthropic(api_key=api_key)
-    raw = client.messages.create(
-        model=PROVIDERS["anthropic"]["model"],
-        max_tokens=4096,
-        system=_SYSTEM,
-        messages=[{"role": "user", "content": _USER_TMPL.format(context_json=context_json)}],
+    # Structured outputs guarantee schema-valid JSON; server-side fallback re-runs a
+    # refused request on another model inside the same call.
+    resp = client.beta.messages.create(
+        model=model_for("anthropic"),
+        max_tokens=16000,
+        system=system,
+        messages=[{"role": "user", "content": user}],
+        output_config={
+            "effort": "medium",
+            "format": {"type": "json_schema", "schema": FORECAST_SCHEMA},
+        },
+        betas=["server-side-fallback-2026-07-01"],
+        fallbacks="default",
     )
-    text = next((b.text for b in raw.content if b.type == "text"), "")
-    return _parse_json(text) if text else []
+    if resp.stop_reason == "refusal":
+        category = getattr(getattr(resp, "stop_details", None), "category", None)
+        raise RuntimeError(f"Claude declined the request (refusal: {category})")
+    return next((b.text for b in resp.content if b.type == "text"), "")
 
 
-def _call_groq(context_json: str, user_key: str = "") -> list[dict]:
+def _complete_groq(system: str, user: str, api_key: str) -> str:
     from groq import Groq
-    api_key = user_key or get_secret("GROQ_API_KEY")
-    if not api_key:
-        return []
-    client = Groq(api_key=api_key)
-    resp = client.chat.completions.create(
-        model=PROVIDERS["groq"]["model"],
+
+    resp = Groq(api_key=api_key).chat.completions.create(
+        model=model_for("groq"),
         max_tokens=4096,
-        messages=[
-            {"role": "system", "content": _SYSTEM},
-            {"role": "user",   "content": _USER_TMPL.format(context_json=context_json)},
-        ],
+        response_format={"type": "json_object"},
+        messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
     )
-    text = resp.choices[0].message.content or ""
-    return _parse_json(text) if text else []
+    return resp.choices[0].message.content or ""
 
 
-def _call_openai(context_json: str, user_key: str = "") -> list[dict]:
-    api_key = user_key or get_secret("OPENAI_API_KEY")
-    if not api_key:
-        return []
+def _complete_openai_compatible(url: str, provider: str, system: str, user: str, api_key: str) -> str:
     resp = _requests.post(
-        "https://api.openai.com/v1/chat/completions",
+        url,
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         json={
-            "model":      PROVIDERS["openai"]["model"],
-            "max_tokens": 4096,
-            "messages": [
-                {"role": "system", "content": _SYSTEM},
-                {"role": "user",   "content": _USER_TMPL.format(context_json=context_json)},
-            ],
+            "model":           model_for(provider),
+            "max_tokens":      4096,
+            "response_format": {"type": "json_object"},
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
         },
-        timeout=30,
+        timeout=60,
     )
     resp.raise_for_status()
-    text = resp.json()["choices"][0]["message"]["content"] or ""
-    return _parse_json(text) if text else []
+    return resp.json()["choices"][0]["message"]["content"] or ""
 
 
-def _call_deepseek(context_json: str, user_key: str = "") -> list[dict]:
-    api_key = user_key or get_secret("DEEPSEEK_API_KEY")
-    if not api_key:
-        return []
-    resp = _requests.post(
-        "https://api.deepseek.com/chat/completions",
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json={
-            "model":      PROVIDERS["deepseek"]["model"],
-            "max_tokens": 4096,
-            "messages": [
-                {"role": "system", "content": _SYSTEM},
-                {"role": "user",   "content": _USER_TMPL.format(context_json=context_json)},
-            ],
-        },
-        timeout=30,
-    )
-    resp.raise_for_status()
-    text = resp.json()["choices"][0]["message"]["content"] or ""
-    return _parse_json(text) if text else []
+def _complete_openai(system: str, user: str, api_key: str) -> str:
+    return _complete_openai_compatible("https://api.openai.com/v1/chat/completions", "openai", system, user, api_key)
 
 
-def _call_gemini(context_json: str, user_key: str = "") -> list[dict]:
+def _complete_deepseek(system: str, user: str, api_key: str) -> str:
+    return _complete_openai_compatible("https://api.deepseek.com/chat/completions", "deepseek", system, user, api_key)
+
+
+def _complete_gemini(system: str, user: str, api_key: str) -> str:
     from google import genai
     from google.genai import types
-    api_key = user_key or get_secret("GOOGLE_API_KEY")
-    if not api_key:
-        return []
-    client = genai.Client(api_key=api_key)
-    resp = client.models.generate_content(
-        model=PROVIDERS["gemini"]["model"],
-        contents=_USER_TMPL.format(context_json=context_json),
-        config=types.GenerateContentConfig(system_instruction=_SYSTEM, max_output_tokens=4096),
+
+    resp = genai.Client(api_key=api_key).models.generate_content(
+        model=model_for("gemini"),
+        contents=user,
+        config=types.GenerateContentConfig(
+            system_instruction=system,
+            max_output_tokens=4096,
+            response_mime_type="application/json",
+        ),
     )
-    text = resp.text or ""
-    return _parse_json(text) if text else []
+    return resp.text or ""
 
 
 _CALLERS = {
-    "anthropic": _call_anthropic,
-    "openai":    _call_openai,
-    "groq":      _call_groq,
-    "deepseek":  _call_deepseek,
-    "gemini":    _call_gemini,
+    "anthropic": _complete_anthropic,
+    "openai":    _complete_openai,
+    "groq":      _complete_groq,
+    "deepseek":  _complete_deepseek,
+    "gemini":    _complete_gemini,
 }
+
+
+# ── Generate → parse → validate → (retry once) ────────────────────────────────
+
+def _anchor_price(context_json: str) -> float | None:
+    try:
+        return float(json.loads(context_json).get("spy_live_price") or 0) or None
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
+def generate_forecast(provider: str, context_json: str, api_key: str) -> list[dict]:
+    """
+    Call the provider and return 10 validated forecast days. If the first reply
+    is malformed (wrong day count, weekend dates, implausible prices…), retry once
+    with the specific problems fed back. Raises ForecastValidationError if the
+    retry is still invalid.
+    """
+    caller = _CALLERS[provider]
+    anchor = _anchor_price(context_json)
+    user = _USER_TMPL.format(context_json=context_json)
+
+    errors: list[str] = []
+    for attempt in (1, 2):
+        text = caller(_SYSTEM, user, api_key)
+        try:
+            check = validate_forecast(parse_forecast(text), anchor)
+        except ValueError as exc:
+            errors = [str(exc)]
+        else:
+            if check.repairs:
+                logger.info("%s forecast repaired: %s", provider, "; ".join(check.repairs))
+            if check.ok:
+                return check.days
+            errors = check.errors
+        logger.warning("%s forecast invalid (attempt %d): %s", provider, attempt, "; ".join(errors[:5]))
+        user = _USER_TMPL.format(context_json=context_json) + retry_message(errors)
+    raise ForecastValidationError(errors)
+
 
 _forecast_cache = MemoryCache()
 
@@ -171,26 +209,27 @@ def fetch_ai_prediction(
     provider: str = "groq",
     _user_key: str = "",
 ) -> list[dict]:
-    """Fetch a 10-day SPY forecast from the selected AI provider.
+    """Fetch a validated 10-day SPY forecast from the selected AI provider.
 
     cache_key  = "YYYY-MM-DD-HH-<provider>" — stable for one hour.
     _context_json and _user_key are prefixed with _ to signal they are not
     part of the cache key (personal-key results get their own namespace, see
-    forecast_store_key). Empty results (missing key, unparseable reply) are not
-    cached, so fixing the key or retrying works immediately.
+    forecast_store_key). Returns [] when no API key is available (not cached,
+    so adding a key works immediately). Fresh forecasts are logged for scoring.
     """
-    store_key = forecast_store_key(cache_key, provider, _user_key)
-    ttl = CACHE_TTL["fetch_ai_prediction"]
+    if provider not in _CALLERS:
+        raise ValueError(f"Unknown provider: {provider!r}")
 
+    store_key = forecast_store_key(cache_key, provider, _user_key)
     result, hit = _forecast_cache.get(store_key)
     if hit:
         return result
 
-    caller = _CALLERS.get(provider)
-    if caller is None:
-        raise ValueError(f"Unknown provider: {provider!r}")
+    api_key = _user_key or get_secret(PROVIDERS[provider]["env_var"])
+    if not api_key:
+        return []
 
-    result = caller(_context_json, user_key=_user_key)
-    if result:
-        _forecast_cache.set(store_key, result, ttl)
+    result = generate_forecast(provider, _context_json, api_key)
+    _forecast_cache.set(store_key, result, CACHE_TTL["fetch_ai_prediction"])
+    log_forecast(provider, model_for(provider), _anchor_price(_context_json), result)
     return result

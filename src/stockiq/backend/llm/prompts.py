@@ -1,6 +1,5 @@
 """LLM prompt templates and JSON output parser for SPY forecasts."""
 
-import json
 
 
 _SYSTEM = (
@@ -29,7 +28,7 @@ _SYSTEM = (
     # ── Hard constraints ─────────────────────────────────────────────────────
     "Range width must strictly widen with each successive day. "
     "Do not invent macro events. Reason only from the data provided. "
-    "Output must be a valid JSON array — no markdown, no explanation, nothing else."
+    "Output must be a single valid JSON object — no markdown, no explanation, nothing else."
 )
 
 _USER_TMPL = """\
@@ -41,7 +40,7 @@ Apply your signal weights from the system instructions. Produce a 10-trading-day
 
 Output rules:
 - Day 1 = today. Day 2 = next trading day — skip weekends and US market holidays.
-- Return ONLY a JSON array of exactly 10 objects with these keys:
+- Return ONLY a JSON object of the form {{"days": [ ... ]}} where "days" holds exactly 10 objects with these keys:
   "date"       : "YYYY-MM-DD"
   "direction"  : "Bullish" | "Bearish" | "Neutral"
   "est_close"  : number (estimated EOD close, 2 decimal places)
@@ -52,10 +51,17 @@ Output rules:
 """
 
 
+def retry_message(errors: list[str]) -> str:
+    """Appended to the user prompt when the first reply failed validation."""
+    bullet = "\n".join(f"- {e}" for e in errors[:10])
+    return (
+        "\n\nYour previous answer was rejected for these reasons:\n"
+        f"{bullet}\n"
+        'Return the corrected forecast as {"days": [...]} with exactly 10 trading days.'
+    )
+
+
 def _parse_json(text: str) -> list[dict]:
-    text = text.strip()
-    if text.startswith("```"):
-        text = text.split("```")[1]
-        if text.startswith("json"):
-            text = text[4:]
-    return json.loads(text.strip())
+    """Backwards-compatible alias — see llm.validation.parse_forecast."""
+    from stockiq.backend.llm.validation import parse_forecast
+    return parse_forecast(text)

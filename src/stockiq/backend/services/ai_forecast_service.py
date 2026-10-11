@@ -4,6 +4,13 @@ import pandas as pd
 from datetime import date as _date, datetime as _datetime
 
 from stockiq.backend.llm import PROVIDERS, fetch_ai_prediction, get_secret
+from stockiq.backend.llm.track_record import load_forecasts, score_forecasts
+from stockiq.backend.llm.validation import ForecastValidationError
+
+__all__ = [
+    "ForecastValidationError", "get_ai_forecast", "get_app_key", "get_forecast_track_record",
+    "get_market_status", "get_providers", "has_app_key",
+]
 from stockiq.backend.models.spy_context import (
     build_forecast_context,
     is_market_open,
@@ -126,3 +133,19 @@ def get_ai_forecast(
         provider=provider,
         _user_key=user_key,
     )
+
+
+def get_forecast_track_record() -> dict:
+    """
+    Score every logged forecast against actual SPY closes.
+    Returns {"table": DataFrame (provider × horizon), "forecasts": int}.
+    """
+    from stockiq.backend.data.yf_fetch import fetch_ohlcv
+
+    records = load_forecasts()
+    if not records:
+        return {"table": pd.DataFrame(), "forecasts": 0}
+    spy = fetch_ohlcv("SPY", 400)
+    if spy.empty:
+        return {"table": pd.DataFrame(), "forecasts": len(records)}
+    return {"table": score_forecasts(records, spy["Close"]), "forecasts": len(records)}

@@ -1,11 +1,13 @@
 """Shared AI 10-day SPY forecast view — used by spy_dashboard and spy_gap_table."""
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
 
 from stockiq.backend.services.ai_forecast_service import (
+    ForecastValidationError,
     get_ai_forecast,
     get_app_key,
     get_market_status,
@@ -142,8 +144,7 @@ def render_ai_forecast(gaps_df: pd.DataFrame, quote: dict, show_share_btn: bool 
         )
         return
 
-    et     = timezone(timedelta(hours=-4))
-    now_et = datetime.now(et)
+    now_et = datetime.now(ZoneInfo("America/New_York"))   # handles EST/EDT
 
     # ── Gate: only call the API when the user explicitly requests it ──────────
     cache_key = f"{now_et.strftime('%Y-%m-%d-%H')}-{provider}"
@@ -171,6 +172,14 @@ def render_ai_forecast(gaps_df: pd.DataFrame, quote: dict, show_share_btn: bool 
     with st.spinner(f"Generating AI forecast via {prov_info['label']}…"):
         try:
             predictions = get_ai_forecast(gaps_df, provider=provider, user_key=user_key, cache_key=cache_key)
+        except ForecastValidationError as e:
+            st.error(
+                f"{prov_info['label']} returned an invalid forecast twice, so it was discarded "
+                "rather than shown. Try again or pick another provider."
+            )
+            with st.expander("What was wrong"):
+                st.markdown("\n".join(f"- {err}" for err in e.errors[:10]))
+            return
         except Exception as e:
             err = str(e)
             if "429" in err or "402" in err or "Payment Required" in err or "RESOURCE_EXHAUSTED" in err or "quota" in err.lower() or "rate" in err.lower():

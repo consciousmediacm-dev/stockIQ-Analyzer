@@ -173,3 +173,13 @@ class TestSearchCompanies:
         mock_search_cls.side_effect = Exception("search error")
         result = search_companies("apple")
         assert result == []
+
+
+@patch("stockiq.backend.data.yf_fetch.yf.download")
+def test_fetch_ohlcv_empty_keeps_ohlcv_columns(mock_download):
+    """Callers compute indicators on the result even when no provider has data."""
+    from stockiq.backend.models.indicators import compute_rsi
+    mock_download.return_value = pd.DataFrame()
+    df = fetch_ohlcv("NOPE", 30)
+    assert df.empty and "Close" in df.columns
+    compute_rsi(df)   # must not raise

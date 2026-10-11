@@ -39,7 +39,8 @@ def fetch_ohlcv(ticker: str, period_days: int) -> pd.DataFrame:
 
     start = (datetime.today() - timedelta(days=period_days + 1450)).date()
     data = get_daily_history([ticker], start, datetime.today().date())
-    return data.get(ticker, pd.DataFrame())
+    # Callers index df["Close"] even when empty — keep the OHLCV columns
+    return data.get(ticker, pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"]))
 
 
 def get_company_name(ticker: str) -> str:
