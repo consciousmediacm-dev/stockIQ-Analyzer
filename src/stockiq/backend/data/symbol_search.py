@@ -28,8 +28,9 @@ _built_at = 0.0
 _WORD = re.compile(r"[A-Z0-9]+")
 
 
-def _entry(symbol: str, name: str, exchange: str, is_etf: bool, dvol: float) -> dict:
-    name = name or symbol
+def _entry(symbol: str, name, exchange, is_etf, dvol: float) -> dict:
+    name = name if isinstance(name, str) and name.strip() else symbol       # NaN / None in older files
+    exchange = exchange if isinstance(exchange, str) else ""
     upper = name.upper()
     return {
         "symbol": symbol, "name": name, "exchange": exchange or "", "is_etf": bool(is_etf),
@@ -44,8 +45,13 @@ def build_index(snapshot=None, listing: list[dict] | None = None) -> list[dict]:
     out: dict[str, dict] = {}
     if snapshot is not None and not snapshot.empty:
         for r in snapshot[["symbol", "name", "exchange", "is_etf", "dollar_vol_20"]].itertuples(index=False):
-            dvol = float(r.dollar_vol_20) if r.dollar_vol_20 == r.dollar_vol_20 else 0.0   # NaN → 0
-            out[r.symbol] = _entry(r.symbol, r.name, r.exchange, r.is_etf, dvol)
+            try:
+                dvol = float(r.dollar_vol_20)
+                dvol = dvol if dvol == dvol else 0.0                                # NaN → 0
+            except (TypeError, ValueError):
+                dvol = 0.0
+            if isinstance(r.symbol, str) and r.symbol:
+                out[r.symbol] = _entry(r.symbol, r.name, r.exchange, r.is_etf == r.is_etf and bool(r.is_etf), dvol)
     for s in listing:
         if s["symbol"] not in out:
             out[s["symbol"]] = _entry(s["symbol"], s["name"], s["exchange"], s["is_etf"], 0.0)
@@ -130,6 +136,11 @@ def rank_symbols(query: str, index: list[dict], limit: int = 5) -> list[dict]:
 def _display_name(name: str) -> str:
     """'Apple Inc. - Common Stock' → 'Apple Inc.'"""
     return " ".join(name.split(" - ")[0].split())
+
+
+def symbol_names() -> dict[str, str]:
+    """symbol → short company name for every symbol in the index."""
+    return {e["symbol"]: _display_name(e["name"]) for e in _get_index()}
 
 
 def suggest_symbols(query: str, limit: int = 5) -> list[dict]:

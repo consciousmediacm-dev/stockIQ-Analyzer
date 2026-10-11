@@ -42,6 +42,17 @@ def render_status_page() -> None:
         with st.expander(f"Data-quality notes ({len(issues)})"):
             st.markdown("\n".join(f"- {i}" for i in issues))
 
+    # ── Full-market snapshot (Market Screener + ticker search) ────────────────
+    st.subheader("Full-market snapshot")
+    snap = status["snapshot"]
+    s1, s2, s3 = st.columns(3)
+    s1.metric("Symbols loaded", f"{snap['rows']:,}")
+    s2.metric("Latest bar", snap["latest_bar"] or "—")
+    s3.metric("Built (UTC)", (snap["built_at"] or "—")[:16].replace("T", " "))
+    if snap["rows"] < 5000:
+        st.warning("Fewer symbols than a full build (~11,000). The app re-checks for a newer build every "
+                   "30 minutes; **Manage app → Reboot** on Streamlit Cloud forces it now.")
+
     # ── Caches ────────────────────────────────────────────────────────────────
     st.subheader("Pre-built screener data")
     caches = pd.DataFrame(status["caches"])

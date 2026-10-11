@@ -85,7 +85,9 @@ def test_loader_prefers_repo_file_then_download(tmp_path, monkeypatch, snap_df):
     repo, local = tmp_path / "repo.parquet", tmp_path / "local.parquet"
     monkeypatch.setattr(loader, "REPO_FILE", repo)
     monkeypatch.setattr(loader, "LOCAL_FILE", local)
+    monkeypatch.setattr(loader, "LOCAL_META", tmp_path / "local.json")
     monkeypatch.setattr(loader, "MARKET_SNAPSHOT_URL", "https://example.invalid/snap.parquet")
+    monkeypatch.setattr(loader, "_remote_generated_at", lambda: None)     # version check unavailable
     downloads = []
 
     def fake_download(url, dest):
@@ -106,9 +108,35 @@ def test_loader_prefers_repo_file_then_download(tmp_path, monkeypatch, snap_df):
     loader.load_market_snapshot.clear()
 
 
+def test_loader_redownloads_when_a_newer_build_is_published(tmp_path, monkeypatch, snap_df):
+    monkeypatch.setattr(loader, "REPO_FILE", tmp_path / "none.parquet")
+    monkeypatch.setattr(loader, "LOCAL_FILE", tmp_path / "local.parquet")
+    monkeypatch.setattr(loader, "LOCAL_META", tmp_path / "local.json")
+    monkeypatch.setattr(loader, "MARKET_SNAPSHOT_URL", "https://example.invalid/snap.parquet")
+    version = {"v": "2026-10-11T17:00:00+00:00"}
+    monkeypatch.setattr(loader, "_remote_generated_at", lambda: version["v"])
+    downloads = []
+
+    def fake_download(url, dest):
+        downloads.append(version["v"])
+        (snap_df.head(2) if len(downloads) == 1 else snap_df).to_parquet(dest)   # first build was small
+        return True
+
+    monkeypatch.setattr(loader, "_download", fake_download)
+    loader.load_market_snapshot.clear()
+    assert len(loader.load_market_snapshot()) == 2
+    loader.load_market_snapshot.clear()
+    assert len(loader.load_market_snapshot()) == 2 and len(downloads) == 1    # same build → reuse
+    version["v"] = "2026-10-11T18:48:00+00:00"
+    loader.load_market_snapshot.clear()
+    assert len(loader.load_market_snapshot()) == len(snap_df) and len(downloads) == 2
+    loader.load_market_snapshot.clear()
+
+
 def test_loader_empty_when_nothing_available(tmp_path, monkeypatch):
     monkeypatch.setattr(loader, "REPO_FILE", tmp_path / "none.parquet")
     monkeypatch.setattr(loader, "LOCAL_FILE", tmp_path / "none2.parquet")
+    monkeypatch.setattr(loader, "_remote_generated_at", lambda: None)
     monkeypatch.setattr(loader, "_download", lambda url, dest: False)
     loader.load_market_snapshot.clear()
     assert loader.load_market_snapshot().empty

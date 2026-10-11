@@ -5,7 +5,8 @@ import logging
 import pandas as pd
 
 from stockiq.backend.data.symbol_search import suggest_symbols
-from stockiq.backend.data.yf_fetch import fetch_ohlcv, get_company_name
+from stockiq.backend.cache import ttl_cache
+from stockiq.backend.data.yf_fetch import fetch_ohlcv, get_company_name, search_companies
 from stockiq.backend.models.indicators import (
     compute_buying_pressure,
     compute_daily_gaps,
@@ -22,8 +23,20 @@ logger = logging.getLogger(__name__)
 
 
 def suggest_tickers(query: str, limit: int = 5) -> list[dict]:
-    """Type-ahead matches across all US stocks and ETFs: [{symbol, name, exchange, type}]."""
-    return suggest_symbols(query, limit)
+    """
+    Type-ahead matches across all US stocks and ETFs: [{symbol, name, exchange, type}].
+    Ranked locally; when the local list has nothing (not loaded yet, or a non-US
+    name like "bitcoin"), Yahoo's search fills in.
+    """
+    local = suggest_symbols(query, limit)
+    if local or len(query.strip()) < 2:
+        return local
+    return _yahoo_suggest(query.strip().lower())[:limit]
+
+
+@ttl_cache(3600)
+def _yahoo_suggest(query: str) -> list[dict]:
+    return search_companies(query)
 
 
 def get_stock_df(ticker: str) -> pd.DataFrame:

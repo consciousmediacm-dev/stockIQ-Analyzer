@@ -85,8 +85,20 @@ def configured_keys() -> list[dict]:
     return [{"key": k, "purpose": v, "set": bool(os.environ.get(k))} for k, v in API_KEYS.items()]
 
 
+def market_snapshot_status() -> dict:
+    """Rows, latest bar and build time of the full-market snapshot this app has loaded."""
+    from stockiq.backend.data import market_snapshot as ms
+    df = ms.load_market_snapshot()
+    return {
+        "rows": len(df),
+        "latest_bar": None if df.empty else str(df["last_date"].max()),
+        "built_at": ms._local_generated_at() or ("bundled with the repo" if ms.REPO_FILE.exists() else None),
+    }
+
+
 def get_system_status() -> dict:
     return {
+        "snapshot":  market_snapshot_status(),
         "providers": provider_status(),
         "caches":    cache_freshness(),
         "keys":      configured_keys(),

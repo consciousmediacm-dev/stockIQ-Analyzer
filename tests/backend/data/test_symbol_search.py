@@ -61,3 +61,21 @@ def test_limit_and_shape():
     assert rank_symbols("spy", _index())[0]["type"] == "ETF"
     assert rank_symbols("aapl", _index())[0]["name"] == "Apple Inc."   # " - Common Stock" trimmed
     assert rank_symbols("   ", _index()) == []
+
+
+def test_service_falls_back_to_yahoo_when_local_has_nothing(monkeypatch):
+    import stockiq.backend.services.analyzer_service as svc
+
+    monkeypatch.setattr(svc, "suggest_symbols", lambda q, limit: [])
+    monkeypatch.setattr(svc, "search_companies", lambda q: [
+        {"symbol": "MSFT", "name": "Microsoft", "exchange": "NMS", "type": "EQUITY"}])
+    svc._yahoo_suggest.clear()
+    assert svc.suggest_tickers("msft")[0]["symbol"] == "MSFT"
+    assert svc.suggest_tickers("m") == []                      # 1 letter: no network call
+    svc._yahoo_suggest.clear()
+
+
+def test_old_snapshot_with_missing_names_still_indexes():
+    old = pd.DataFrame({"symbol": ["MSFT"], "name": [None], "exchange": [None],
+                        "is_etf": [None], "dollar_vol_20": [None]})
+    assert rank_symbols("msft", build_index(old, []))[0]["symbol"] == "MSFT"
