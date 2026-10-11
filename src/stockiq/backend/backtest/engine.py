@@ -115,6 +115,12 @@ def build_ticker_panel(
     panel = pd.DataFrame(index=df.index)
     panel["ticker"] = ticker
     panel["close"] = df["Close"]
+    # Point-in-time liquidity: split adjustments cancel in price × volume, so this
+    # matches what traded that day (an adjusted *price* filter would not).
+    if "Volume" in df.columns:
+        panel["dollar_vol_20"] = (df["Close"] * df["Volume"]).rolling(20, min_periods=10).mean()
+    else:
+        panel["dollar_vol_20"] = np.nan
     panel = panel.join(comps)
     panel["rsi"] = ind["RSI"]
     panel["rsi_zone"] = _rsi_zone(ind["RSI"])
@@ -144,13 +150,26 @@ def build_events(
     end: str | pd.Timestamp | None = None,
     step: int = 1,
     bounce_threshold: float = 5.0,
+    min_dollar_vol: float = 0.0,
 ) -> pd.DataFrame:
     """
     Long panel (date, ticker, signals…, ret_h, mae_h, exc_h) across the universe.
 
     step > 1 keeps every step-th bar per ticker to reduce overlap between
     forward windows (step >= max(horizons) gives non-overlapping samples).
+    With a benchmark, the sampling grid is the benchmark's calendar and is
+    applied per ticker before concatenation, which keeps memory flat for
+    thousands of tickers.
+    min_dollar_vol drops samples whose 20-day average dollar volume *at the
+    signal date* was below the threshold (untradeable / penny names).
     """
+    grid = None
+    if step > 1 and benchmark is not None and not benchmark.empty:
+        cal = benchmark.sort_index().index
+        if start is not None:
+            cal = cal[cal >= pd.Timestamp(start)]
+        grid = cal[::step]
+
     frames = []
     for ticker, df in prices.items():
         p = build_ticker_panel(ticker, df, horizons, bounce_threshold)
@@ -160,7 +179,12 @@ def build_events(
             p = p[p.index >= pd.Timestamp(start)]
         if end is not None:
             p = p[p.index <= pd.Timestamp(end)]
-        frames.append(p)
+        if grid is not None:
+            p = p[p.index.isin(grid)]
+        if min_dollar_vol:
+            p = p[p["dollar_vol_20"] >= min_dollar_vol]
+        if not p.empty:
+            frames.append(p)
     if not frames:
         return pd.DataFrame()
 
@@ -180,7 +204,7 @@ def build_events(
     events["bounce_top30"] = np.where(ranks <= 30, "Top 30 by bounce score", "Not shown")
 
     # Subsample on a shared date grid so cross-sectional groups stay aligned
-    if step > 1:
+    if step > 1 and grid is None:
         grid = events.index.unique().sort_values()[::step]
         events = events[events.index.isin(grid)]
     return events
@@ -260,12 +284,14 @@ def run_backtest(
     start=None,
     end=None,
     step: int = 5,
+    min_dollar_vol: float = 0.0,
 ) -> dict:
     """
     Full backtest. Returns {"events": DataFrame, "tables": {title: DataFrame},
     "regression": {h: DataFrame}, "meta": {...}}.
     """
-    events = build_events(prices, benchmark, horizons, start=start, end=end, step=step)
+    events = build_events(prices, benchmark, horizons, start=start, end=end, step=step,
+                          min_dollar_vol=min_dollar_vol)
     if events.empty:
         return {"events": events, "tables": {}, "regression": {}, "meta": {"tickers": 0, "rows": 0}}
 
@@ -290,6 +316,7 @@ def run_backtest(
         "end": str(events.index.max().date()),
         "horizons": list(horizons),
         "step": step,
+        "min_dollar_vol": min_dollar_vol,
         "benchmark": benchmark is not None and not benchmark.empty,
     }
     return {"events": events, "tables": tables, "regression": regression, "meta": meta}

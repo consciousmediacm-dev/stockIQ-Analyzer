@@ -164,3 +164,42 @@ def test_run_backtest_and_report(universe, tmp_path):
 def test_run_backtest_empty_when_history_too_short():
     result = run_backtest({"X": _make_ohlcv(200)}, None, horizons=(5,))
     assert result["events"].empty and result["tables"] == {}
+
+
+# ── grid sampling & point-in-time liquidity filter ────────────────────────────
+
+def test_benchmark_grid_matches_global_grid(universe):
+    """Per-ticker grid filtering (memory-flat path) gives the same samples as the global grid."""
+    prices, bench = universe
+    with_bench = build_events(prices, bench, horizons=(5,), step=10)
+    no_bench = build_events(prices, None, horizons=(5,), step=10)
+    assert len(with_bench) > 0
+    per_date = with_bench.groupby(level="date")["ticker"].nunique()
+    assert (per_date == len(prices)).mean() > 0.95          # same dates for every ticker
+    assert abs(len(with_bench) - len(no_bench)) <= len(prices) * 2
+
+
+def test_min_dollar_vol_filters_at_signal_date(universe):
+    prices, bench = universe
+    full = build_events(prices, bench, horizons=(5,), step=5)
+    cut = full["dollar_vol_20"].median()
+    liquid = build_events(prices, bench, horizons=(5,), step=5, min_dollar_vol=cut)
+    assert 0 < len(liquid) < len(full)
+    assert (liquid["dollar_vol_20"] >= cut).all()
+
+
+def test_cli_universe_sample(monkeypatch, tmp_path):
+    import stockiq.backend.backtest.__main__ as cli
+    import stockiq.backend.data.universe as uni
+
+    monkeypatch.setattr(uni, "_cache", [{"symbol": f"T{i}", "name": "", "exchange": "", "is_etf": False}
+                                        for i in range(10)])
+    seen = {}
+
+    def fake_load(tickers, years):
+        seen["tickers"] = tickers
+        return {}
+
+    monkeypatch.setattr(cli, "load_prices", fake_load)
+    assert cli.main(["--universe", "us_equities", "--sample", "4", "--out", str(tmp_path)]) == 1  # no data
+    assert len(set(seen["tickers"]) - {"SPY"}) == 4

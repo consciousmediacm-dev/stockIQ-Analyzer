@@ -42,7 +42,8 @@ def render_markdown(result: dict, focus_horizon: int | None = None) -> str:
         "",
         f"Generated {datetime.now():%Y-%m-%d %H:%M} · {meta.get('tickers', 0)} tickers · "
         f"{meta.get('rows', 0):,} samples · {meta.get('start')} → {meta.get('end')} · "
-        f"step {meta.get('step')} · benchmark: {'SPY' if meta.get('benchmark') else 'none'}",
+        f"step {meta.get('step')} · benchmark: {'SPY' if meta.get('benchmark') else 'none'}"
+        + (f" · min 20-day $ volume ${meta['min_dollar_vol']:,.0f}" if meta.get("min_dollar_vol") else ""),
         "",
         CAVEATS,
         HOW_TO_READ,

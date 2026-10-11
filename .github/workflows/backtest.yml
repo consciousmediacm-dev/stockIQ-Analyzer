@@ -7,9 +7,18 @@ name: Backtest
 on:
   workflow_dispatch:
     inputs:
+      universe:
+        description: "Universe: sp500 | nasdaq100 | us_equities | us_etfs | us_all"
+        default: "sp500"
       tickers:
-        description: "First N tickers of the S&P universe (ignored if symbols is set)"
+        description: "First N tickers of the universe (ignored if sample or symbols is set)"
         default: "300"
+      sample:
+        description: "Random sample of N tickers from the universe (0 = use tickers)"
+        default: "0"
+      min_dollar_vol:
+        description: "Skip signals whose 20-day avg $ volume at the time was below this (0 = off)"
+        default: "0"
       symbols:
         description: "Explicit space-separated symbols (optional)"
         default: ""
@@ -46,7 +55,10 @@ jobs:
 
       - name: Run backtest
         env:
+          IN_UNIVERSE: ${{ github.event.inputs.universe }}
           IN_TICKERS: ${{ github.event.inputs.tickers }}
+          IN_SAMPLE: ${{ github.event.inputs.sample }}
+          IN_MIN_DVOL: ${{ github.event.inputs.min_dollar_vol }}
           IN_SYMBOLS: ${{ github.event.inputs.symbols }}
           IN_YEARS: ${{ github.event.inputs.years }}
           IN_STEP: ${{ github.event.inputs.step }}
@@ -54,7 +66,11 @@ jobs:
         run: |
           set -euo pipefail
           read -r -a HZ <<< "${IN_HORIZONS:-5 20 60}"
-          ARGS=(--years "$IN_YEARS" --step "$IN_STEP" --horizons "${HZ[@]}" --out reports/backtest)
+          ARGS=(--years "$IN_YEARS" --step "$IN_STEP" --horizons "${HZ[@]}" --out reports/backtest
+                --universe "$IN_UNIVERSE" --sample "$IN_SAMPLE" --min-dollar-vol "$IN_MIN_DVOL")
+          if [[ "$IN_UNIVERSE" == us_* && ! -f cache/screener/universe.json ]]; then
+            python cache/scripts/build_universe_cache.py
+          fi
           if [ -n "$IN_SYMBOLS" ]; then
             read -r -a SYMS <<< "$IN_SYMBOLS"
             python -m stockiq.backend.backtest "${ARGS[@]}" --symbols "${SYMS[@]}"
