@@ -27,7 +27,7 @@ UNIVERSES = ("sp500", "nasdaq100", "us_equities", "us_etfs", "us_all")
 
 # Instruments that aren't ordinary shares — excluded from the equity universe
 _NON_COMMON = re.compile(
-    r"\b(warrants?|units?|rights?|preferred|pfd|notes? due|debentures?|subordinated|"
+    r"\b(warrants?|units?|rights?|preferred|preference|pfd|notes? due|debentures?|subordinated|"
     r"trust preferred|depositary shares? representing .*preferred|when issued|contingent value)\b",
     re.IGNORECASE,
 )
@@ -43,7 +43,12 @@ def _norm_symbol(sym: str) -> str:
 
 
 def _keep(symbol: str, name: str) -> bool:
-    if not symbol or "$" in symbol or " " in symbol:
+    """
+    Keep ordinary shares, ADRs and ETFs. The raw (pre-normalisation) CQS symbol marks
+    non-common classes in lower case — AHLpD (preferred), ABCw / ABCws (warrants),
+    ABCr (rights), ABCu (units) — so any lower-case letter means "not a common share".
+    """
+    if not symbol or "$" in symbol or " " in symbol or any(ch.islower() for ch in symbol):
         return False
     return not _NON_COMMON.search(name or "")
 
