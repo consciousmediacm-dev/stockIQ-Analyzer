@@ -238,6 +238,8 @@ Y|SPY|SPDR S&P 500 ETF Trust|P| |Y|100|N||SPY|SPY|N
 Y|ABCDW|ABCD Corp - Warrants|Q|G|N|100|N|N||ABCDW|N
 Y|XYZ$A|XYZ Corp 6% Preferred Series A|N| |N|100|N||XYZ$A|XYZ$A|N
 Y|ZVZZT|NASDAQ TEST STOCK|Q|G|N|100|Y|N||ZVZZT|N
+Y|AHL-D|Aspen Insurance Holdings Limited 5.625% Perpetual Pref Shares|N| |N|100|N||AHLpD|AHL-D|N
+Y|XYZWS|XYZ Corp Warrants to purchase|N| |N|100|N||XYZws|XYZ.WS|N
 File Creation Time: 1010202620:01|||||||||||
 """
 

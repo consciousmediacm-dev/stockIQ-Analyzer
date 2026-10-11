@@ -19,6 +19,9 @@ on:
       step:
         description: "Sample every N trading days (use ≥ 20 for non-overlapping 20-day samples)"
         default: "5"
+      horizons:
+        description: "Forward horizons in trading days (space-separated)"
+        default: "5 20 60 120"
 
 permissions:
   contents: read
@@ -47,9 +50,11 @@ jobs:
           IN_SYMBOLS: ${{ github.event.inputs.symbols }}
           IN_YEARS: ${{ github.event.inputs.years }}
           IN_STEP: ${{ github.event.inputs.step }}
+          IN_HORIZONS: ${{ github.event.inputs.horizons }}
         run: |
           set -euo pipefail
-          ARGS=(--years "$IN_YEARS" --step "$IN_STEP" --out reports/backtest)
+          read -r -a HZ <<< "${IN_HORIZONS:-5 20 60}"
+          ARGS=(--years "$IN_YEARS" --step "$IN_STEP" --horizons "${HZ[@]}" --out reports/backtest)
           if [ -n "$IN_SYMBOLS" ]; then
             read -r -a SYMS <<< "$IN_SYMBOLS"
             python -m stockiq.backend.backtest "${ARGS[@]}" --symbols "${SYMS[@]}"
@@ -57,8 +62,10 @@ jobs:
             python -m stockiq.backend.backtest "${ARGS[@]}" --tickers "$IN_TICKERS"
           fi
 
-      - name: Print report
-        run: cat reports/backtest/report.md
+      - name: Print report and every CSV (all horizons)
+        run: |
+          cat reports/backtest/report.md
+          for f in reports/backtest/*.csv; do echo; echo "=== $(basename "$f")"; cat "$f"; done
 
       - uses: actions/upload-artifact@v4
         with:
