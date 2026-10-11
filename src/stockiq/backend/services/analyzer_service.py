@@ -4,7 +4,8 @@ import logging
 
 import pandas as pd
 
-from stockiq.backend.data.yf_fetch import fetch_ohlcv, get_company_name, search_companies
+from stockiq.backend.data.symbol_search import suggest_symbols
+from stockiq.backend.data.yf_fetch import fetch_ohlcv, get_company_name
 from stockiq.backend.models.indicators import (
     compute_buying_pressure,
     compute_daily_gaps,
@@ -20,9 +21,9 @@ from stockiq.backend.models.signals import find_crosses, indicator_readout
 logger = logging.getLogger(__name__)
 
 
-def search_stocks(query: str) -> list[dict]:
-    """Yahoo Finance company search. Returns list of {symbol, name, exchange, type}."""
-    return search_companies(query)
+def suggest_tickers(query: str, limit: int = 5) -> list[dict]:
+    """Type-ahead matches across all US stocks and ETFs: [{symbol, name, exchange, type}]."""
+    return suggest_symbols(query, limit)
 
 
 def get_stock_df(ticker: str) -> pd.DataFrame:

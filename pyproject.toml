@@ -10,6 +10,7 @@ dependencies = [
     # can change behaviour silently. constraints.txt pins the exact versions CI
     # tests against — bump both together.
     "streamlit>=1.50,<2.0",
+    "streamlit-searchbox>=0.1.24,<0.2",
     "yfinance>=0.2.30,<2.0",
     "plotly>=5.0,<8.0",
     "pandas>=2.0,<4.0",
