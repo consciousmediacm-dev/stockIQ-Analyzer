@@ -17,9 +17,10 @@ site:
 
 description: >
   Free stock market analyzer with real-time technical analysis.
-  Scan the S&P 500 for MA5/20/50/100/200, RSI, Fibonacci retracement,
-  short squeeze setups, MA-200 bounce candidates, Munger-quality stocks,
-  and AI-powered SPY forecasts — no login required.
+  Screen every US-listed stock and ETF by moving averages, RSI, returns and
+  liquidity; analyze any symbol with MA5/20/50/100/200, RSI, Fibonacci levels
+  and candlestick patterns; short squeeze and Munger-quality scanners; signal
+  backtesting; and AI-powered SPY outlooks — no login required.
 
 keywords:
   - free stock screener
@@ -31,12 +32,11 @@ keywords:
   - short squeeze scanner
   - 200 day moving average stocks
   - 200 week moving average
-  - stock bounce radar
-  - MA200 support stocks
+  - full market stock screener
+  - stock signal backtest
   - Charlie Munger stock strategy
   - candlestick reversal patterns
   - golden cross death cross
-  - stock trading signals
   - weekly monthly stock screener
   - SPY forecast AI
   - SPY gap fill tracker
@@ -49,9 +49,10 @@ faq:
   - q: "What is StockIQ?"
     a: >
       StockIQ is a free, open-source web app that provides institutional-grade
-      technical analysis for S&P 500 stocks — including moving averages, RSI,
-      Fibonacci retracement, candlestick patterns, short squeeze scanner, bounce
-      radar, Munger quality watchlist, and AI-powered SPY forecasts.
+      technical analysis for US stocks and ETFs — including a full-market
+      screener, moving averages, RSI, Fibonacci retracement, candlestick patterns,
+      short squeeze scanner, Munger quality watchlist, signal backtesting and
+      AI-powered SPY forecasts.
 
   - q: "Is StockIQ free to use?"
     a: >
@@ -67,10 +68,9 @@ faq:
 
   - q: "What is the 200-day moving average used for?"
     a: >
-      The 200-day moving average is a key long-term support and resistance level.
-      Stocks that pull back to this level while oversold (RSI below 30) often
-      produce strong bounce setups. StockIQ's Bounce Radar flags these candidates
-      automatically.
+      The 200-day moving average smooths roughly ten months of prices and is
+      widely watched as a long-term trend line. The Market Screener shows every
+      stock's distance from its 200-day average so you can filter on it.
 
   - q: "What is the 200-week moving average?"
     a: >
@@ -88,16 +88,17 @@ faq:
   - q: "How is RSI calculated?"
     a: >
       The Relative Strength Index (RSI-14) measures price momentum over 14
-      periods using Wilder's smoothing method. RSI above 70 signals overbought
-      conditions where a pullback is likely; below 30 signals oversold conditions
-      where a bounce is possible.
+      periods using Wilder's smoothing method. Readings above 70 are conventionally
+      called overbought and below 30 oversold. These are descriptions of recent
+      momentum, not forecasts — use the Signal Backtest page to see how such
+      readings have actually played out.
 
   - q: "What is a Golden Cross and Death Cross?"
     a: >
       A Golden Cross occurs when the 50-day moving average crosses above the
-      200-day moving average — a strong bullish trend signal. A Death Cross is
-      the opposite: the 50-day crosses below the 200-day, signalling a potential
-      long-term downtrend.
+      200-day moving average; a Death Cross is the opposite. They are popular
+      trend markers, but in our backtests neither reliably predicted returns —
+      the app shows them as information, not as buy or sell signals.
 
   - q: "What is a Fibonacci retracement?"
     a: >

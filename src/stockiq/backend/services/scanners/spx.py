@@ -1,9 +1,8 @@
-"""SPX-universe scanners: candle screener, bounce, squeeze, Munger, analyst consensus."""
+"""SPX-universe scanners: candle screener, squeeze, Munger, analyst consensus."""
 
 import pandas as pd
 
 from stockiq.backend.data.screeners import (
-    fetch_spx_bounce_radar_scan,
     fetch_spx_candle_momentum_scan,
     fetch_spx_forward_pe_scan,
     fetch_spx_munger_scan,
@@ -16,11 +15,6 @@ from stockiq.backend.data.screeners import (
 def get_candle_momentum_scan() -> pd.DataFrame:
     """Weekly/monthly candle screener for S&P 500. Cached 1 hour."""
     return fetch_spx_candle_momentum_scan()
-
-
-def get_bounce_radar_scan(threshold_pct: float = 5.0, top_n: int = 30) -> pd.DataFrame:
-    """Stocks within ±threshold_pct of their 200-day MA, sorted by bounce score."""
-    return fetch_spx_bounce_radar_scan(threshold_pct, top_n)
 
 
 def get_squeeze_scan(

@@ -4,8 +4,59 @@ import pandas as pd
 from stockiq.backend.config import MA_PERIODS
 
 
+def indicator_readout(row: pd.Series, prev_row: pd.Series) -> list[tuple[str, str]]:
+    """
+    Neutral, factual description of where price sits relative to its indicators,
+    as (direction, text) pairs with direction in {"up", "down", "flat"} for
+    colouring only. No buy/sell verdict: the composite score that used to sit
+    here showed no edge in backtests (see backtest/) and was removed from the UI.
+    """
+    out: list[tuple[str, str]] = []
+    price = float(row["Close"])
+
+    have = [p for p in MA_PERIODS if not np.isnan(row.get(f"MA{p}", np.nan))]
+    if have:
+        above = [p for p in have if price > row[f"MA{p}"]]
+        names = "/".join(str(p) for p in have)
+        out.append((
+            "up" if len(above) > len(have) / 2 else "down",
+            f"Price is above {len(above)} of {len(have)} daily moving averages ({names})",
+        ))
+
+    ma50, ma200 = row.get("MA50", np.nan), row.get("MA200", np.nan)
+    p50, p200 = prev_row.get("MA50", np.nan), prev_row.get("MA200", np.nan)
+    if not any(np.isnan(v) for v in (ma50, ma200, p50, p200)):
+        if p50 <= p200 and ma50 > ma200:
+            out.append(("up", "MA50 crossed above MA200 today (golden cross)"))
+        elif p50 >= p200 and ma50 < ma200:
+            out.append(("down", "MA50 crossed below MA200 today (death cross)"))
+        else:
+            rel = "above" if ma50 > ma200 else "below"
+            out.append(("up" if rel == "above" else "down",
+                        f"MA50 is {rel} MA200 ({(ma50 / ma200 - 1) * 100:+.1f}%)"))
+
+    ma5, ma20 = row.get("MA5", np.nan), row.get("MA20", np.nan)
+    if not (np.isnan(ma5) or np.isnan(ma20)):
+        out.append(("up" if ma5 > ma20 else "down",
+                    f"MA5 is {'above' if ma5 > ma20 else 'below'} MA20 (short-term direction)"))
+
+    ma200w = row.get("MA200W", np.nan)
+    if not np.isnan(ma200w):
+        out.append(("up" if price > ma200w else "down",
+                    f"Price is {(price / ma200w - 1) * 100:+.1f}% vs its 200-week average"))
+
+    rsi = row.get("RSI", np.nan)
+    if not np.isnan(rsi):
+        zone = "overbought zone (≥ 70)" if rsi >= 70 else "oversold zone (≤ 30)" if rsi <= 30 else "mid-range (30–70)"
+        out.append(("flat", f"RSI {rsi:.1f} — {zone}"))
+    return out
+
+
 def signal_score(row: pd.Series, prev_row: pd.Series) -> tuple[int, list[str]]:
     """
+    RETIRED FROM THE UI — kept so the backtester can keep measuring the old
+    composite score (it showed no edge over the market; see backtest/).
+
     Returns (score, reasons).
     score:  +2 strong buy · +1 buy · 0 neutral · -1 sell · -2 strong sell
     """
@@ -87,7 +138,7 @@ def signal_score(row: pd.Series, prev_row: pd.Series) -> tuple[int, list[str]]:
 
 
 def overall_signal(score: int) -> tuple[str, str]:
-    """Maps score → (label, css_color)."""
+    """Maps score → (label, css_color). Backtest research only — see signal_score."""
     if score >= 4:
         return "STRONG BUY",  "#16A34A"
     elif score >= 2:

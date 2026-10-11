@@ -43,11 +43,15 @@ def _download(url: str, dest: Path) -> bool:
 
 
 def _read(path: Path) -> pd.DataFrame:
+    """Read a snapshot and align it to the current schema (older files may have
+    extra or missing columns until the next nightly build)."""
+    from stockiq.backend.market.snapshot import SNAPSHOT_COLUMNS
     try:
-        return pd.read_parquet(path)
+        df = pd.read_parquet(path)
     except Exception as exc:
         logger.warning("Could not read %s: %s", path, exc)
         return pd.DataFrame()
+    return df.reindex(columns=SNAPSHOT_COLUMNS)
 
 
 @ttl_cache(1800)

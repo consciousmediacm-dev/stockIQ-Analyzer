@@ -16,11 +16,9 @@ class ScreenFilters:
     min_dollar_vol: float = 0.0             # 20-day avg $ volume
     rsi_min: float = 0.0
     rsi_max: float = 100.0
-    labels: list[str] = field(default_factory=list)          # signal score labels
     candle_signals: list[str] = field(default_factory=list)
     dist_ma200_min: float | None = None
     dist_ma200_max: float | None = None
-    bounce_only: bool = False
     query: str = ""                          # symbol / name contains
     sort_by: str = "dollar_vol_20"
     ascending: bool = False
@@ -29,11 +27,10 @@ class ScreenFilters:
 
 PRESETS: dict[str, dict] = {
     "Everything (most liquid first)": {},
-    "Strong Buy signal score":  {"labels": ["STRONG BUY"], "sort_by": "score"},
-    "Strong Sell signal score": {"labels": ["STRONG SELL"], "sort_by": "score", "ascending": True},
+    "Above all 5 moving averages": {"_min_above_ma": 5, "sort_by": "ret_3m_pct"},
+    "Below all 5 moving averages": {"_max_above_ma": 0, "sort_by": "ret_3m_pct", "ascending": True},
     "Oversold (RSI ≤ 30)":      {"rsi_max": 30, "sort_by": "rsi", "ascending": True},
     "Overbought (RSI ≥ 70)":    {"rsi_min": 70, "sort_by": "rsi"},
-    "MA200 Bounce Radar":       {"bounce_only": True, "sort_by": "bounce_score"},
     "Candle momentum: Strong Buy": {"candle_signals": ["🟢 Strong Buy"], "sort_by": "ret_1m_pct"},
     "Near 52-week high (≤ 2%)": {"sort_by": "pct_from_52w_high", "_near_high": 2.0},
     "Biggest movers today":     {"sort_by": "chg_1d_pct", "_abs_sort": True},
@@ -49,7 +46,8 @@ def get_market_snapshot() -> dict:
 
 
 def screen_market(df: pd.DataFrame, f: ScreenFilters, near_high: float | None = None,
-                  abs_sort: bool = False) -> pd.DataFrame:
+                  abs_sort: bool = False, min_above_ma: int | None = None,
+                  max_above_ma: int | None = None) -> pd.DataFrame:
     """Apply filters and sorting. Pure function — unit-tested without data files."""
     if df.empty:
         return df
@@ -70,16 +68,16 @@ def screen_market(df: pd.DataFrame, f: ScreenFilters, near_high: float | None = 
         m &= df["rsi"] >= f.rsi_min
     if f.rsi_max < 100:
         m &= df["rsi"] <= f.rsi_max
-    if f.labels:
-        m &= df["label"].isin(f.labels)
     if f.candle_signals:
         m &= df["candle_signal"].isin(f.candle_signals)
     if f.dist_ma200_min is not None:
         m &= df["dist_ma200_pct"] >= f.dist_ma200_min
     if f.dist_ma200_max is not None:
         m &= df["dist_ma200_pct"] <= f.dist_ma200_max
-    if f.bounce_only:
-        m &= df["bounce_score"].notna()
+    if min_above_ma is not None:
+        m &= df["above_ma_count"] >= min_above_ma
+    if max_above_ma is not None:
+        m &= df["above_ma_count"] <= max_above_ma
     if near_high is not None:
         m &= df["pct_from_52w_high"] >= -near_high
     if f.query:
@@ -99,6 +97,9 @@ def filters_from_preset(name: str, **overrides) -> tuple[ScreenFilters, dict]:
     extra = {}
     if "_near_high" in preset:
         extra["near_high"] = preset.pop("_near_high")
+    for key in ("_min_above_ma", "_max_above_ma"):
+        if key in preset:
+            extra[key[1:]] = preset.pop(key)
     if preset.pop("_abs_sort", False):
         extra["abs_sort"] = True
     preset.update({k: v for k, v in overrides.items() if v is not None})

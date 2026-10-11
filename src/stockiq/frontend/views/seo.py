@@ -49,7 +49,7 @@ _json_ld = {
                 "Candlestick reversal pattern detection",
                 "S&P 500 weekly and monthly candle screener",
                 "Short squeeze scanner with squeeze score",
-                "Bounce radar for stocks near 200-day MA",
+                "Full-market screener for every US stock and ETF",
                 "Charlie Munger quality stock watchlist",
                 "AI-powered SPY 5-day price forecast",
                 "Golden Cross and Death Cross detection",

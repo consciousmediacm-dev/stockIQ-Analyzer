@@ -27,17 +27,16 @@
 
 | Page | What it does |
 |------|-------------|
-| **Stock Analyzer** | Interactive candlestick chart with MA5/20/50/100/200, weekly MA200, RSI subplot, Fibonacci retracement, 7 reversal patterns, Golden/Death cross, signal score card |
+| **Stock Analyzer** | Interactive candlestick chart with MA5/20/50/100/200, weekly MA200, RSI subplot, Fibonacci retracement, 7 reversal patterns, Golden/Death cross, neutral indicator readout (no buy/sell verdict — see Backtesting) |
 | **Candle Screener** | Top 50 S&P 500 stocks ranked by candle pattern strength (Strong Buy → Sell), weekly and monthly views |
 
 ### Scanners
 
 | Page | What it does |
 |------|-------------|
-| **Market Screener (all US)** | Every active US-listed stock and ETF (~10k), refreshed nightly: filter by type, exchange, price, liquidity, RSI, signal score, candle signal, MA200 distance, 52-week high; presets for the scanners below; one click opens the Analyzer |
+| **Market Screener (all US)** | Every active US-listed stock and ETF (~10k), refreshed nightly: filter by type, exchange, price, liquidity, RSI, moving-average position, candle signal, MA200 distance, 52-week high; one click opens the Analyzer |
 | **Pre-Market Scanner** | NASDAQ-100 pre-market movers with a 7-day daily close heatmap |
 | **NASDAQ RSI Scanner** | NASDAQ-100 stocks filtered by RSI — quickly spot oversold / overbought conditions |
-| **MA200 Bounce Radar** | Stocks within 5% of their 200-day MA — classic mean-reversion setups |
 | **Short Squeeze Scanner** | High RSI + short interest = potential short squeeze candidates |
 | **Analyst Buy Picks** | Highest-rated S&P 500 stocks by analyst consensus with ≥5% upside to price target |
 | **Analyst Sell Picks** | Most-downgraded stocks with ≥5% downside to price target |
@@ -63,7 +62,7 @@ Choose your AI provider — Groq, Gemini, DeepSeek, OpenAI, or Claude. The model
 ---
 
 ### Stock Analyzer
-Interactive candlestick chart with MA5/20/50/100/200, weekly MA200, RSI subplot, Fibonacci retracement, seven reversal patterns, and a signal score card.
+Interactive candlestick chart with MA5/20/50/100/200, weekly MA200, RSI subplot, Fibonacci retracement, seven reversal patterns, and a neutral indicator readout.
 
 ![Stock Analyzer](docs/screenshots/analyzer.png)
 
@@ -185,11 +184,17 @@ python -m stockiq.backend.backtest --symbols AAPL MSFT --step 20      # non-over
 python -m stockiq.backend.backtest --csv-dir ./vendor_prices          # TICKER.csv files from any vendor
 ```
 
-The report (`reports/backtest/<date>/report.md` + CSVs) covers the Stock Analyzer signal score
+The report (`reports/backtest/<date>/report.md` + CSVs) covers the retired buy/sell signal score
 and each of its five components, RSI zones, the MA200 Bounce Radar and the Candle Screener, at
 5/20/60-day horizons: hit rate, mean/median return, excess return vs SPY, worst drawdown while
 holding (MAE) and a t-stat. A regression shows how much each score component really contributes.
 The same results are available in the app under **Research → Signal Backtest**.
+
+**Findings (Oct 2026, 10 years):** across 290 large S&P names and a random 999-stock sample
+of the whole US market (≥ $5M/day traded at the time), the old composite buy/sell score showed
+no edge — STRONG BUY never beat the market average at 5–120 days — and the MA200 Bounce Radar
+underperformed. Both were removed from the app. Oversold RSI (≤ 30) was the one reading that
+beat the market at 20–60 days in both samples, with deep interim drawdowns.
 
 Entry is the next day's open (no look-ahead). Read the caveats at the top of every report —
 survivorship bias, overlapping windows and zero trading costs all flatter the results.

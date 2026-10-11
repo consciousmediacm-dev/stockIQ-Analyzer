@@ -16,7 +16,6 @@ market:
 
 screeners:
   fetch_spx_candle_momentum_scan: 3600    # Weekly/monthly candle screener — hourly
-  fetch_spx_bounce_radar_scan: 1800       # MA200 bounce radar — 30 min (price-sensitive)
   fetch_spx_squeeze_scan: 3600            # Short squeeze — hourly (RSI moves intraday)
   fetch_spx_munger_scan: 43200            # Munger quality — 12 h (fundamentals are quarterly)
   fetch_spx_strong_buy_scan: 21600        # Analyst consensus buy — 6 h (ratings change weekly)

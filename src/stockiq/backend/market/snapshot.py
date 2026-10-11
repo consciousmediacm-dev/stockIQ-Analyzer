@@ -4,8 +4,8 @@ Full-market snapshot: one row of indicators per US-listed stock and ETF.
 Built nightly by cache/scripts/build_market_snapshot.py (GitHub Actions) and
 published as a Release asset; the app loads it via data/market_snapshot.py and
 the Market Screener filters it. Every indicator uses the same functions as the
-live pages (signal score, candle tiers, bounce score), so a symbol scores the
-same here as in the Stock Analyzer.
+live pages (moving averages, RSI, candle tiers), so a symbol reads the same
+here as in the Stock Analyzer.
 """
 
 import logging
@@ -17,8 +17,7 @@ import numpy as np
 import pandas as pd
 
 from stockiq.backend.backtest.engine import _candle_label, candle_counts
-from stockiq.backend.backtest.signals_vec import add_indicators, score_components
-from stockiq.backend.models.signals import bounce_score
+from stockiq.backend.backtest.signals_vec import add_indicators
 
 logger = logging.getLogger(__name__)
 
@@ -26,15 +25,13 @@ logger = logging.getLogger(__name__)
 HISTORY_DAYS = 1600
 MIN_BARS = 30           # below this a symbol is skipped (brand-new listings)
 MAX_STALE_DAYS = 7      # last bar older than this (calendar days) → delisted / halted, skipped
-BOUNCE_THRESHOLD = 5.0
 
 SNAPSHOT_COLUMNS = [
     "symbol", "name", "exchange", "is_etf", "last_date", "bars",
     "close", "chg_1d_pct", "ret_1w_pct", "ret_1m_pct", "ret_3m_pct", "ret_1y_pct",
     "volume", "avg_vol_20", "dollar_vol_20", "high_52w", "low_52w", "pct_from_52w_high",
-    "ma20", "ma50", "ma200", "ma200w", "dist_ma50_pct", "dist_ma200_pct", "rsi",
-    "score", "label", "c_ma_align", "c_cross", "c_momentum", "c_ma200w", "c_rsi",
-    "weekly_green", "monthly_green", "candle_signal", "bounce_score", "gap_pct",
+    "ma20", "ma50", "ma200", "ma200w", "dist_ma50_pct", "dist_ma200_pct", "dist_ma200w_pct", "rsi",
+    "above_ma_count", "weekly_green", "monthly_green", "candle_signal", "gap_pct",
 ]
 
 
@@ -65,9 +62,8 @@ def snapshot_row(symbol: str, ohlcv: pd.DataFrame, meta: dict | None = None,
         return None
 
     ind = add_indicators(df)
-    comps = score_components(ind)
     candles = candle_counts(df)
-    last, c = ind.iloc[-1], comps.iloc[-1]
+    last = ind.iloc[-1]
     close = df["Close"]
     vol = df["Volume"] if "Volume" in df.columns else pd.Series(0.0, index=df.index)
 
@@ -78,11 +74,9 @@ def snapshot_row(symbol: str, ohlcv: pd.DataFrame, meta: dict | None = None,
     dist200 = (float(last["Close"]) / ma200 - 1) * 100 if ma200 else None
     ma50 = _num(last.get("MA50"))
     rsi = _num(last.get("RSI"), 1)
-    have_ma200w = not pd.isna(last.get("MA200W"))
-
-    b_score = None
-    if dist200 is not None and abs(dist200) <= BOUNCE_THRESHOLD and rsi is not None:
-        b_score = round(bounce_score(dist200, rsi, BOUNCE_THRESHOLD), 1)
+    ma200w = _num(last.get("MA200W"))
+    mas = [last.get(f"MA{p}") for p in (5, 20, 50, 100, 200)]
+    above_ma = sum(1 for m in mas if not pd.isna(m) and float(last["Close"]) > float(m))
 
     prev_close = float(close.iloc[-2]) if len(close) > 1 else None
     wg, mg = candles["weekly_green"].iloc[-1], candles["monthly_green"].iloc[-1]
@@ -109,18 +103,15 @@ def snapshot_row(symbol: str, ohlcv: pd.DataFrame, meta: dict | None = None,
         "ma20":              _num(last.get("MA20")),
         "ma50":              ma50,
         "ma200":             ma200,
-        "ma200w":            _num(last.get("MA200W")),
+        "ma200w":            ma200w,
         "dist_ma50_pct":     _num((float(last["Close"]) / ma50 - 1) * 100) if ma50 else None,
         "dist_ma200_pct":    _num(dist200),
+        "dist_ma200w_pct":   _num((float(last["Close"]) / ma200w - 1) * 100) if ma200w else None,
         "rsi":               rsi,
-        # The score needs MA200 and the 200-week MA, exactly like the Analyzer card
-        "score":             int(c["score"]) if ma200 and have_ma200w else None,
-        "label":             c["label"] if ma200 and have_ma200w else None,
-        **{k: int(c[k]) for k in ("c_ma_align", "c_cross", "c_momentum", "c_ma200w", "c_rsi")},
+        "above_ma_count":    above_ma,
         "weekly_green":      None if pd.isna(wg) else int(wg),
         "monthly_green":     None if pd.isna(mg) else int(mg),
         "candle_signal":     None if pd.isna(mg) else str(_candle_label(pd.Series([wg]), pd.Series([mg]))[0]),
-        "bounce_score":      b_score,
         "gap_pct":           _num((float(df["Open"].iloc[-1]) / prev_close - 1) * 100) if prev_close else None,
     }
 
