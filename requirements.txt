@@ -1,0 +1,16 @@
+# Streamlit Community Cloud installs from this file. Exact pins — the versions CI tests.
+# Must match constraints.txt line for line (tests/test_requirements_sync.py enforces it).
+anthropic==1.13.0
+google-genai==2.29.0
+groq==1.7.0
+numpy==2.4.6; python_version < "3.12"     # numpy 2.5 dropped Python 3.11
+numpy==2.5.3; python_version >= "3.12"
+pandas==3.0.5
+plotly==7.1.0
+pyarrow==23.0.1
+python-dotenv==1.2.3
+PyYAML==6.0.3
+requests==2.34.2
+streamlit==1.65.0
+tabulate==0.10.0
+yfinance==1.7.0

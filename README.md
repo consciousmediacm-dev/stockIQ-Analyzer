@@ -159,6 +159,7 @@ AI forecast track record and backtest prices survive restarts.
 | `SCREENER_TICKER_COUNT` | `300` | Scan fewer tickers while developing |
 
 Templates: `.env.example` (local / Docker) and `.streamlit/secrets.toml.example` (Streamlit Cloud).
+Hosting on Streamlit Community Cloud (free): see [docs/DEPLOY_STREAMLIT.md](docs/DEPLOY_STREAMLIT.md).
 **Info → System Status** in the app shows which keys are set, provider health, cache ages and
 recent warnings.
 
