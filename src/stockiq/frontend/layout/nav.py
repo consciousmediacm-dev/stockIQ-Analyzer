@@ -1,5 +1,7 @@
 import streamlit as st
 
+from stockiq.brand import APP_NAME
+
 # All page paths are relative to the project root (where app.py lives).
 _VIEWS = "src/stockiq/frontend/views"
 
@@ -35,7 +37,7 @@ def get_pages() -> dict:
             st.Page(f"{_VIEWS}/backtest_page.py", title="Signal Backtest", icon="🧪", url_path="backtest"),
         ],
         "Info": [
-            st.Page(f"{_VIEWS}/about.py", title="About StockIQ", icon="ℹ️", url_path="about"),
+            st.Page(f"{_VIEWS}/about.py", title=f"About {APP_NAME}", icon="ℹ️", url_path="about"),
             st.Page(f"{_VIEWS}/status_page.py", title="System Status", icon="🩺", url_path="status"),
         ],
     }

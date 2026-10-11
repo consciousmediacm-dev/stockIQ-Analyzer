@@ -20,7 +20,7 @@ from stockiq.backend.backtest.report import write_report
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Backtest StockIQ signals")
+    ap = argparse.ArgumentParser(description="Backtest the app's buy/sell signals")
     ap.add_argument("--tickers", type=int, default=50, help="first N tickers of the SPX universe")
     ap.add_argument("--symbols", nargs="*", help="explicit ticker list (overrides --tickers)")
     ap.add_argument("--years", type=float, default=10, help="evaluation window in years")

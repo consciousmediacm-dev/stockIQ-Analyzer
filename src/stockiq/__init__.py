@@ -1,3 +1,3 @@
-"""StockIQ — Free S&P 500 Technical Analysis & Screener."""
+"""stockiq — technical analysis, scanners and AI market outlook (based on the MIT-licensed StockIQ project)."""
 
 __version__ = "0.0.1"

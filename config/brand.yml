@@ -1,0 +1,10 @@
+# Brand settings — the only file to edit when your brand assets are ready.
+# Everything user-facing (banner, page titles, About page, SEO tags, the
+# "unavailable" page) reads from here. Empty values hide the related UI.
+
+app_name:    "Stock Analyzer"          # placeholder until brand assets are uploaded
+tagline:     "Technical analysis, scanners and AI market outlook"
+site_url:    ""                        # public URL once deployed (used for SEO / share links)
+logo_url:    ""                        # optional image URL shown in the top banner
+support_url: ""                        # optional "support us" / donation link; hidden when empty
+support_label: "Support this project"

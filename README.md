@@ -1,19 +1,15 @@
-# StockIQ — Free S&P 500 Technical Analysis & Screener
+# Stock Analyzer — Technical Analysis, Scanners & AI Market Outlook
 
 [![CI](https://github.com/consciousmediacm-dev/stockIQ-Analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/consciousmediacm-dev/stockIQ-Analyzer/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org)
 [![Streamlit](https://img.shields.io/badge/built%20with-Streamlit-FF4B4B)](https://streamlit.io)
-[![Live App](https://img.shields.io/badge/Live%20App-stpicker.streamlit.app-brightgreen)](https://stpicker.streamlit.app/)
-[![Sponsor](https://img.shields.io/badge/Sponsor-❤-pink)](https://github.com/sponsors/Mamun)
 
-> **StockIQ** is a free, open-source web app that gives retail investors institutional-grade technical analysis — moving averages, RSI, Fibonacci retracements, candlestick patterns, options intelligence, and AI-powered forecasts — without a Bloomberg terminal.
-
-## Try it now — no install needed
-
-**[https://stpicker.streamlit.app/](https://stpicker.streamlit.app/)**
-
-The live app runs on Streamlit Community Cloud and is free to use. No account or API key required.
+> A web app for technical analysis — moving averages, RSI, Fibonacci retracements, candlestick
+> patterns, options intelligence, market scanners, signal backtesting and AI-powered outlooks.
+>
+> Built on [StockIQ](https://github.com/Mamun/stockIQ) by Mamun (MIT licensed). The product name
+> and branding are configured in `config/brand.yml`.
 
 ---
 
@@ -180,7 +176,7 @@ streamlit run app.py
 
 ## Backtesting the signals
 
-Every buy/sell label in StockIQ can be replayed over history to see whether it actually worked.
+Every buy/sell label in the app can be replayed over history to see whether it actually worked.
 
 ```bash
 python -m stockiq.backend.backtest --tickers 50 --years 10            # top 50 S&P names, 10 years
@@ -280,7 +276,7 @@ sources are down.
 | **Google** | Gemini 2.5 Flash | Yes | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
 | **DeepSeek** | DeepSeek-V3 | Pay-as-you-go (very cheap) | [platform.deepseek.com](https://platform.deepseek.com/api_keys) |
 | **OpenAI** | GPT-4.1 Mini | Pay-as-you-go | [platform.openai.com](https://platform.openai.com/api-keys) |
-| **Anthropic** | Claude Opus | Pay-as-you-go | [console.anthropic.com](https://console.anthropic.com/settings/keys) |
+| **Anthropic** | Claude Sonnet 5.5 | Pay-as-you-go | [console.anthropic.com](https://console.anthropic.com/settings/keys) |
 
 ---
 
@@ -298,25 +294,6 @@ See [good first issues](https://github.com/consciousmediacm-dev/stockIQ-Analyzer
 
 ---
 
-## Sponsoring StockIQ
-
-StockIQ is free and open source. Hosting, API costs, and development time are funded entirely by community support. If this tool saves you time or helps your trading research, please consider sponsoring:
-
-| Platform | Link |
-|----------|------|
-| **GitHub Sponsors** | [github.com/sponsors/Mamun](https://github.com/sponsors/Mamun) |
-| **Ko-fi** | [ko-fi.com/stockiq](https://ko-fi.com/stockiq) |
-| **Open Collective** | [opencollective.com/stockiq](https://opencollective.com/stockiq) |
-| **Buy Me a Coffee** | [buymeacoffee.com/mamuninfo](https://buymeacoffee.com/mamuninfo) |
-
-Your sponsorship helps keep the project free for everyone and funds:
-
-- AI provider API costs for the SPY Outlook feature
-- Ongoing data-quality improvements
-- New screeners and indicators requested by the community
-
----
-
 ## Roadmap
 
 - [ ] Portfolio tracker — track a watchlist over time
@@ -330,10 +307,10 @@ Your sponsorship helps keep the project free for everyone and funds:
 
 ## License
 
-[MIT](LICENSE) © 2025 Mamun
+[MIT](LICENSE) © 2025 Mamun — original StockIQ project. Modifications in this fork are released under the same license.
 
 ---
 
 ## Disclaimer
 
-StockIQ is for **educational and informational purposes only**. Nothing on this site constitutes financial advice. Always do your own research before making investment decisions.
+This app is for **educational and informational purposes only**. Nothing on this site constitutes financial advice. Always do your own research before making investment decisions.

@@ -1,15 +1,17 @@
 # ── Core identity ──────────────────────────────────────────────────────────────
 site:
+  # name and url come from config/brand.yml (app_name, site_url); every "StockIQ"
+  # below is replaced with brand.app_name at load time.
   name:        "StockIQ"
-  url:         "https://stpicker.streamlit.app"
-  title:       "StockIQ — Free S&P 500 Technical Analysis & Screener"
+  url:         ""
+  title:       "StockIQ — Free Stock Technical Analysis & Screener"
   author:      "StockIQ"
   locale:      "en_US"
   # Paste the content="..." value from Google Search Console → HTML tag method
-  google_verification: "QUZzf0ENFPo0N50E1T1eKSJtymZD0sEzNnSdEBeI0l8"
+  google_verification: ""
   # og:image must be an absolute URL to a publicly accessible image (1200×630 px ideal)
   # Host a screenshot on your GitHub repo and paste the raw URL here.
-  image:       "https://raw.githubusercontent.com/Mamun/stockIQ/main/docs/social_preview.png"
+  image:       ""   # absolute URL to a 1200×630 social preview image
   image_width:  1200
   image_height: 630
 

@@ -183,7 +183,7 @@ def test_anthropic_uses_structured_output_and_fallback(monkeypatch):
     client = _fake_anthropic(monkeypatch)
     assert providers._complete_anthropic("sys", "user", "k") == '{"days": []}'
     kw = client.beta.messages.create.call_args.kwargs
-    assert kw["model"] == "claude-opus-5-5"
+    assert kw["model"] == "claude-sonnet-5-5"
     assert kw["output_config"]["format"]["type"] == "json_schema"
     assert kw["output_config"]["format"]["schema"]["required"] == ["days"]
     assert kw["fallbacks"] == "default" and kw["betas"] == ["server-side-fallback-2026-07-01"]

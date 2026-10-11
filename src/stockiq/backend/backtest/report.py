@@ -38,7 +38,7 @@ def render_markdown(result: dict, focus_horizon: int | None = None) -> str:
     horizons = meta.get("horizons", [])
     h = focus_horizon or (horizons[len(horizons) // 2] if horizons else 20)
     lines = [
-        "# StockIQ signal backtest",
+        "# Signal backtest",
         "",
         f"Generated {datetime.now():%Y-%m-%d %H:%M} · {meta.get('tickers', 0)} tickers · "
         f"{meta.get('rows', 0):,} samples · {meta.get('start')} → {meta.get('end')} · "

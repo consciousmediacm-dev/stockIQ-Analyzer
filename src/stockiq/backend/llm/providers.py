@@ -47,8 +47,8 @@ PROVIDERS: dict[str, dict] = {
         "free":    False,
     },
     "anthropic": {
-        "label":   "Claude Opus 5.5 (Anthropic)",
-        "model":   "claude-opus-5-5",
+        "label":   "Claude Sonnet 5.5 (Anthropic)",
+        "model":   "claude-sonnet-5-5",
         "env_var": "ANTHROPIC_API_KEY",
         "free":    False,
     },
@@ -69,8 +69,9 @@ def _complete_anthropic(system: str, user: str, api_key: str) -> str:
     import anthropic
 
     client = anthropic.Anthropic(api_key=api_key)
-    # Structured outputs guarantee schema-valid JSON; server-side fallback re-runs a
-    # refused request on another model inside the same call.
+    # Sonnet 5.5 for public traffic (half Opus pricing). Structured outputs guarantee
+    # schema-valid JSON; server-side fallback ("default" form — the only one Sonnet 5.5
+    # accepts) re-runs a refused request on another model inside the same call.
     resp = client.beta.messages.create(
         model=model_for("anthropic"),
         max_tokens=16000,
