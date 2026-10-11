@@ -11,6 +11,8 @@ import yfinance as yf
 from stockiq.backend.cache import ttl_cache
 from stockiq.backend.config import CACHE_TTL
 
+logger = logging.getLogger(__name__)
+
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
 _CBOE_SPY_URL = "https://cdn.cboe.com/api/global/delayed_quotes/options/SPY.json"
@@ -74,7 +76,8 @@ def fetch_spx_quote() -> dict:
             "w52_low":    float(info.get("fiftyTwoWeekLow")  or 0),
             "_ts":        int(  info.get("regularMarketTime") or 0),
         }
-    except Exception:
+    except Exception as exc:
+        logger.warning("fetch_spx_quote failed: %s", exc)
         return {}
 
 
@@ -103,7 +106,8 @@ def fetch_spx_quote_cboe() -> dict:
             "w52_low":    None,
             "_ts":        ts,
         }
-    except Exception:
+    except Exception as exc:
+        logger.warning("fetch_spx_quote_cboe failed: %s", exc)
         return {}
 
 
@@ -144,7 +148,8 @@ def fetch_spx_intraday(period: str = "1d", interval: str = "5m") -> pd.DataFrame
         if df.empty or "Close" not in df.columns:
             return pd.DataFrame()
         return df.dropna(subset=["Close"])
-    except Exception:
+    except Exception as exc:
+        logger.warning("fetch_spx_intraday failed: %s", exc)
         return pd.DataFrame()
 
 
@@ -166,7 +171,8 @@ def fetch_spy_options_data(expiration: str = "") -> dict | None:
         exp   = expiration if expiration in all_exps else all_exps[0]
         chain = ticker.option_chain(exp)
         return {"calls": chain.calls, "puts": chain.puts, "expiration": exp, "expirations": all_exps}
-    except Exception:
+    except Exception as exc:
+        logger.warning("fetch_spy_options_data failed: %s", exc)
         return None
 
 
@@ -228,7 +234,8 @@ def fetch_put_call_ratio(scope: str = "daily") -> dict | None:
             "exp_nearest":  expirations[0],
             "exp_farthest": expirations[-1],
         }
-    except Exception:
+    except Exception as exc:
+        logger.warning("fetch_put_call_ratio failed: %s", exc)
         return None
 
 
@@ -266,7 +273,8 @@ def _parse_cboe_options() -> list[dict] | None:
                 "impliedVolatility": float(opt.get("iv", 0) or 0),
             })
         return rows or None
-    except Exception:
+    except Exception as exc:
+        logger.warning("_parse_cboe_options failed: %s", exc)
         return None
 
 

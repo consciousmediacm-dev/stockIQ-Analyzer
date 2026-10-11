@@ -1,5 +1,7 @@
 """SPY-specific data assembly service."""
 
+import logging
+
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -24,6 +26,8 @@ from stockiq.backend.models.options import (
     compute_gex_split, compute_gex_components, compute_expected_move, compute_sweep_signals, compute_vol_regime,
     compute_put_call_ratio,
 )
+
+logger = logging.getLogger(__name__)
 
 _QUOTE_FETCHERS = {
     "yahoo":        fetch_spx_quote,
@@ -66,7 +70,8 @@ def get_spy_quote() -> dict:
                     r = future.result()
                     if r.get("price", 0) > 0:
                         results.append(r)
-                except Exception:
+                except Exception as exc:
+                    logger.debug("get_spy_quote failed: %s", exc)
                     pass
         except TimeoutError:
             pass  # use whatever results arrived before timeout
@@ -163,7 +168,8 @@ def _yahoo_chain_for_bid_ask(expiration: str, side: str) -> pd.DataFrame:
         data = fetch_spy_options_data(expiration=expiration)
         if data:
             return data[side]
-    except Exception:
+    except Exception as exc:
+        logger.debug("_yahoo_chain_for_bid_ask failed: %s", exc)
         pass
     return pd.DataFrame()
 
@@ -187,7 +193,8 @@ def get_spy_gaps_df() -> pd.DataFrame:
         gaps = apply_gap_cache(patch_today_gap(raw, quote))
         gaps["Type"] = classify_gap_types(gaps)
         return gaps
-    except Exception:
+    except Exception as exc:
+        logger.warning("get_spy_gaps_df failed: %s", exc)
         return pd.DataFrame()
 
 
@@ -211,7 +218,8 @@ def get_rsi_top_analysis() -> dict:
             "ma_stretch":    compute_ma_stretch(daily_df),
             "breadth":       check_breadth_divergence(daily_df),
         }
-    except Exception:
+    except Exception as exc:
+        logger.warning("get_rsi_top_analysis failed: %s", exc)
         return {}
 
 
@@ -225,7 +233,8 @@ def get_vol_regime() -> dict | None:
         vix_close = vix_df["Close"].dropna()
         spy_close = spy_df["Close"].dropna() if "Close" in spy_df.columns else pd.Series(dtype=float)
         return compute_vol_regime(vix_close, spy_close)
-    except Exception:
+    except Exception as exc:
+        logger.warning("get_vol_regime failed: %s", exc)
         return None
 
 
@@ -366,7 +375,8 @@ def get_spy_aggregated_gex(
                 d.get("gex_df",      pd.DataFrame()),
                 d.get("oi_df",       pd.DataFrame()),
             )
-        except Exception:
+        except Exception as exc:
+            logger.warning("_fetch failed: %s", exc)
             return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
     call_frames: list[pd.DataFrame] = []

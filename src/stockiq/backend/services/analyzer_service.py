@@ -1,5 +1,7 @@
 """Single-stock analysis service."""
 
+import logging
+
 import pandas as pd
 
 from stockiq.backend.data.yf_fetch import fetch_ohlcv, get_company_name, search_companies
@@ -14,6 +16,8 @@ from stockiq.backend.models.indicators import (
     patch_today_gap,
 )
 from stockiq.backend.models.signals import find_crosses, overall_signal, signal_score
+
+logger = logging.getLogger(__name__)
 
 
 def search_stocks(query: str) -> list[dict]:
@@ -124,7 +128,8 @@ def get_ticker_fundamentals(ticker: str) -> dict:
         market_cap = None
         try:
             market_cap = yf.Ticker(ticker).fast_info.market_cap
-        except Exception:
+        except Exception as exc:
+            logger.debug("get_ticker_fundamentals failed: %s", exc)
             pass
         return {
             "sector":           sector,
@@ -158,5 +163,6 @@ def get_ticker_fundamentals(ticker: str) -> dict:
             "target_high":      info.get("targetHighPrice"),
             "target_low":       info.get("targetLowPrice"),
         }
-    except Exception:
+    except Exception as exc:
+        logger.warning("get_ticker_fundamentals failed: %s", exc)
         return {}

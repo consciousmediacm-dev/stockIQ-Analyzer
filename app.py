@@ -77,20 +77,15 @@ try:
         for _key, _val in st.secrets.items():
             if isinstance(_val, str):
                 os.environ[_key] = _val
-
-        if "gcs_service_account" in st.secrets:
-            import json, tempfile
-            _sa = dict(st.secrets["gcs_service_account"])
-            _sa_file = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
-            json.dump(_sa, _sa_file)
-            _sa_file.flush()
-            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _sa_file.name
     except Exception:
-        pass
+        pass  # no secrets.toml — running locally with .env / environment variables
 
     _src = os.path.join(os.path.dirname(__file__), "src")
     if _src not in sys.path:
         sys.path.insert(0, _src)
+
+    from stockiq.logging_setup import configure_logging
+    configure_logging()
 
     from stockiq.frontend.layout.banner import render_top_banner
     from stockiq.frontend.layout.nav import get_pages
@@ -98,6 +93,8 @@ try:
     from stockiq.frontend.views.seo import inject_seo
 
 except Exception:
+    import logging
+    logging.getLogger("stockiq.app").exception("App failed to start")
     _show_overloaded_page()
 
 # ── SEO metadata ──────────────────────────────────────────────────────────────

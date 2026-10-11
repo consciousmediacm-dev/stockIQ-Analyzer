@@ -1,10 +1,14 @@
 """Forward P/E value-growth screener for SPX_TICKERS."""
 
+import logging
+
 from ._shared import (
     ttl_cache, CACHE_TTL, SPX_TICKERS,
     pd, datetime, timedelta,
     get_metadata, get_forward_pe, _batch_download, _rsi_last,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @ttl_cache(CACHE_TTL["fetch_spx_forward_pe_scan"])
@@ -44,7 +48,8 @@ def fetch_spx_forward_pe_scan() -> pd.DataFrame:
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.get_level_values(0)
             return df.dropna(subset=["Close"])
-        except Exception:
+        except Exception as exc:
+            logger.debug("no close series for %s: %s", ticker, exc)
             return pd.DataFrame()
 
     rows = []

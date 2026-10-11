@@ -1,11 +1,15 @@
 """Bounce radar screener — SPX stocks near their 200-day MA."""
 
+import logging
+
 from ._shared import (
     ttl_cache, CACHE_TTL, SPX_TICKERS,
     np, pd, datetime, timedelta,
     get_metadata, _batch_download, _rsi_last,
 )
 from stockiq.backend.models.signals import bounce_score
+
+logger = logging.getLogger(__name__)
 
 
 @ttl_cache(CACHE_TTL["fetch_spx_bounce_radar_scan"])
@@ -40,7 +44,8 @@ def fetch_spx_bounce_radar_scan(threshold_pct: float = 5.0, top_n: int = 30) -> 
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.get_level_values(0)
             return df.dropna(subset=["Close"])
-        except Exception:
+        except Exception as exc:
+            logger.debug("no frame for %s: %s", ticker, exc)
             return pd.DataFrame()
 
     for ticker in SPX_TICKERS:
@@ -86,7 +91,8 @@ def fetch_spx_bounce_radar_scan(threshold_pct: float = 5.0, top_n: int = 30) -> 
                 "Trend":        trend,
                 "Bounce Score": round(score, 1),
             })
-        except Exception:
+        except Exception as exc:
+            logger.debug("%s skipped: %s", ticker, exc)
             continue
 
     if not results:

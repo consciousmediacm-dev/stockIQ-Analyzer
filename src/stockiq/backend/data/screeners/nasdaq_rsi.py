@@ -1,10 +1,14 @@
 """NASDAQ-100 RSI screener — RSI, moving averages, trend, and volume ratio."""
 
+import logging
+
 from ._shared import (
     ttl_cache, CACHE_TTL, NASDAQ_100_TICKERS,
     pd, datetime, timedelta, compute_rsi,
     _batch_download,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @ttl_cache(CACHE_TTL["fetch_nasdaq_rsi_scan"])
@@ -32,7 +36,8 @@ def fetch_nasdaq_rsi_scan() -> pd.DataFrame:
         is_multi  = isinstance(raw.columns, pd.MultiIndex)
         close_df  = raw["Close"]  if is_multi else raw
         volume_df = raw["Volume"] if is_multi else None
-    except Exception:
+    except Exception as exc:
+        logger.warning("fetch_nasdaq_rsi_scan failed: %s", exc)
         return pd.DataFrame()
 
     results = []
@@ -87,7 +92,8 @@ def fetch_nasdaq_rsi_scan() -> pd.DataFrame:
                 "Vol Ratio":  vol_ratio,
                 "Status":     status,
             })
-        except Exception:
+        except Exception as exc:
+            logger.debug("%s skipped: %s", ticker, exc)
             continue
 
     if not results:

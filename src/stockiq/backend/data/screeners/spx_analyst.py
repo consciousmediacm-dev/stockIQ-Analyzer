@@ -1,11 +1,15 @@
 """Analyst consensus buy/sell screeners for SPX_TICKERS."""
 
+import logging
+
 from ._shared import (
     ttl_cache, CACHE_TTL, SPX_TICKERS,
     np, pd, yf, datetime, timedelta,
     get_metadata, get_analyst_consensus,
     compute_rsi, _batch_download,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @ttl_cache(CACHE_TTL["fetch_spx_strong_buy_scan"])
@@ -46,7 +50,8 @@ def fetch_spx_strong_buy_scan(
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.get_level_values(0)
             return df.dropna(subset=["Close"])
-        except Exception:
+        except Exception as exc:
+            logger.debug("no frame for %s: %s", ticker, exc)
             return pd.DataFrame()
 
     for ticker in SPX_TICKERS:
@@ -116,7 +121,8 @@ def fetch_spx_strong_buy_scan(
                 "RSI":         round(rsi, 1) if not np.isnan(rsi) else None,
                 "SB Score":    round(sb_score, 1),
             })
-        except Exception:
+        except Exception as exc:
+            logger.debug("%s skipped: %s", ticker, exc)
             continue
 
     if not results:
@@ -168,7 +174,8 @@ def fetch_spx_strong_sell_scan(
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.get_level_values(0)
             return df.dropna(subset=["Close"])
-        except Exception:
+        except Exception as exc:
+            logger.debug("no frame for %s: %s", ticker, exc)
             return pd.DataFrame()
 
     for ticker in SPX_TICKERS:
@@ -242,7 +249,8 @@ def fetch_spx_strong_sell_scan(
                 "RSI":         round(rsi, 1) if not np.isnan(rsi) else None,
                 "SS Score":    round(ss_score, 1),
             })
-        except Exception:
+        except Exception as exc:
+            logger.debug("%s skipped: %s", ticker, exc)
             continue
 
     if not results:

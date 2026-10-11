@@ -1,10 +1,14 @@
 """Pre-market movers screener — NASDAQ-100 pre-market prices and volume."""
 
+import logging
+
 from ._shared import (
     ttl_cache, CACHE_TTL, NASDAQ_100_TICKERS,
     pd, yf,
     _NASDAQ_COMPANY_NAMES,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @ttl_cache(CACHE_TTL["fetch_nasdaq_premarket_scan"])
@@ -14,7 +18,8 @@ def fetch_nasdaq_premarket_scan() -> pd.DataFrame:
 
     try:
         daily = yf.download(tickers, period="12d", auto_adjust=True, progress=False)
-    except Exception:
+    except Exception as exc:
+        logger.warning("fetch_nasdaq_premarket_scan failed: %s", exc)
         return pd.DataFrame()
 
     if daily.empty:
@@ -35,7 +40,8 @@ def fetch_nasdaq_premarket_scan() -> pd.DataFrame:
             is_i         = isinstance(intra.columns, pd.MultiIndex)
             intra_close  = intra["Close"]  if is_i else intra
             intra_volume = intra["Volume"] if is_i else pd.DataFrame()
-    except Exception:
+    except Exception as exc:
+        logger.debug("fetch_nasdaq_premarket_scan failed: %s", exc)
         pass
 
     pm_close_df  = pd.DataFrame()
@@ -99,7 +105,8 @@ def fetch_nasdaq_premarket_scan() -> pd.DataFrame:
                 "Prev Close": round(prev_close, 2),
                 "7D Chg %":   chg_7d,
             })
-        except Exception:
+        except Exception as exc:
+            logger.debug("%s skipped: %s", ticker, exc)
             continue
 
     if not results:
@@ -123,7 +130,8 @@ def fetch_nasdaq_premarket_history() -> pd.DataFrame:
     tickers = [t for t in NASDAQ_100_TICKERS if isinstance(t, str)]
     try:
         raw = yf.download(tickers, period="12d", auto_adjust=True, progress=False)
-    except Exception:
+    except Exception as exc:
+        logger.warning("fetch_nasdaq_premarket_history failed: %s", exc)
         return pd.DataFrame()
 
     if raw.empty:

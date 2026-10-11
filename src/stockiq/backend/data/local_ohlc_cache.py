@@ -11,6 +11,8 @@ Retention      : 45 trading days (30 display rows + 14 RSI warmup + buffer)
 Today's bar    : never cached — still mutable while the market is open
 """
 
+import logging
+
 import json
 import os
 import threading
@@ -19,6 +21,8 @@ from datetime import date, timedelta
 import pandas as pd
 
 from stockiq.backend.cache import DATA_DIR
+
+logger = logging.getLogger(__name__)
 
 _CACHE_FILE = DATA_DIR / "ohlc_cache.json"
 _KEEP_DAYS  = 45
@@ -32,7 +36,8 @@ def _load_raw() -> dict:
         return {}
     try:
         return json.loads(_CACHE_FILE.read_text())
-    except Exception:
+    except Exception as exc:
+        logger.warning("_load_raw failed: %s", exc)
         return {}
 
 

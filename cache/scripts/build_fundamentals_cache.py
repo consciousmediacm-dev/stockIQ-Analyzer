@@ -12,12 +12,14 @@ Usage (from project root):
 Writes to: cache/screener/fundamentals.json
 """
 
-import json
 import sys
 import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent))
+
+from _common import write_cache  # noqa: E402
 
 import yfinance as yf
 
@@ -68,9 +70,7 @@ def main() -> None:
     with_roe = sum(1 for v in data.values() if v.get("returnOnEquity") is not None)
     print(f"\nFetched: {len(data)} tickers  ({with_roe} with ROE data)")
 
-    _OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _OUTPUT_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"Saved → {_OUTPUT_FILE}")
+    write_cache(_OUTPUT_FILE, data, expected=len(tickers))
     print("Done. Refresh quarterly after each earnings season.")
 
 

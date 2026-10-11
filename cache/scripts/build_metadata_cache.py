@@ -9,12 +9,14 @@ Usage (from project root):
 Writes to: cache/screener/ticker_metadata.json
 """
 
-import json
 import sys
 import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent))
+
+from _common import write_cache  # noqa: E402
 
 import yfinance as yf
 
@@ -58,9 +60,7 @@ def main() -> None:
     found = sum(1 for v in metadata.values() if v["sector"] != "—")
     print(f"\nFetched: {len(metadata)} tickers  ({found} with sector info)")
 
-    _OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _OUTPUT_FILE.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"Saved → {_OUTPUT_FILE}")
+    write_cache(_OUTPUT_FILE, metadata, expected=len(tickers))
     print("Done. Run `streamlit run app.py` — the app will load from the local cache on startup.")
 
 

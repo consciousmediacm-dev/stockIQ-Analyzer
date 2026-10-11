@@ -1,11 +1,15 @@
 """Weekly/monthly candle momentum screener for SPX_TICKERS."""
 
+import logging
+
 from ._shared import (
     ttl_cache, CACHE_TTL, SPX_TICKERS,
     pd, yf, datetime, timedelta,
     get_metadata, _batch_download, _rsi_last,
 )
 from stockiq.backend.models.signals import candle_momentum_signal
+
+logger = logging.getLogger(__name__)
 
 
 @ttl_cache(CACHE_TTL["fetch_spx_candle_momentum_scan"])
@@ -49,7 +53,8 @@ def fetch_spx_candle_momentum_scan() -> pd.DataFrame:
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.get_level_values(0)
             return df.dropna(subset=["Close"])
-        except Exception:
+        except Exception as exc:
+            logger.debug("no frame for %s: %s", ticker, exc)
             return pd.DataFrame()
 
     spx_ret_1m = 0.0
@@ -129,7 +134,8 @@ def fetch_spx_candle_momentum_scan() -> pd.DataFrame:
                 "_order":    sig_order,
                 "Strength":  weekly_green + monthly_green,
             })
-        except Exception:
+        except Exception as exc:
+            logger.debug("%s skipped: %s", ticker, exc)
             continue
 
     if not recommendations:

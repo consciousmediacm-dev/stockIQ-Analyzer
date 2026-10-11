@@ -1,9 +1,13 @@
 """Options analytics: max pain and open interest by strike."""
 
+import logging
+
 from datetime import datetime
 
 import numpy as np
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 def compute_max_pain(calls: pd.DataFrame, puts: pd.DataFrame) -> float:
@@ -336,7 +340,8 @@ def compute_expected_move(
                 try:
                     dte = (datetime.strptime(expiration, "%Y-%m-%d").date()
                            - datetime.today().date()).days
-                except Exception:
+                except Exception as exc:
+                    logger.debug("_atm_iv failed: %s", exc)
                     pass
             # For same-day or past expiry use intraday DTE (0.5 trading day)
             t = max(dte, 0.5) / 365.0

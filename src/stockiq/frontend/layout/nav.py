@@ -36,5 +36,6 @@ def get_pages() -> dict:
         ],
         "Info": [
             st.Page(f"{_VIEWS}/about.py", title="About StockIQ", icon="ℹ️", url_path="about"),
+            st.Page(f"{_VIEWS}/status_page.py", title="System Status", icon="🩺", url_path="status"),
         ],
     }

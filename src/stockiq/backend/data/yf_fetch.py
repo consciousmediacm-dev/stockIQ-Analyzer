@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 import pandas as pd
 import yfinance as yf
 
+logger = logging.getLogger(__name__)
+
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
 
@@ -21,7 +23,8 @@ def search_companies(query: str) -> list[dict]:
             for r in quotes
             if r.get("symbol") and r.get("quoteType") in ("EQUITY", "ETF", "MUTUALFUND", "INDEX")
         ]
-    except Exception:
+    except Exception as exc:
+        logger.warning("search_companies failed: %s", exc)
         return []
 
 
@@ -43,5 +46,6 @@ def get_company_name(ticker: str) -> str:
     """Fetch the long company name from yfinance; falls back to ticker on error."""
     try:
         return yf.Ticker(ticker).info.get("longName", ticker)
-    except Exception:
+    except Exception as exc:
+        logger.warning("get_company_name failed: %s", exc)
         return ticker

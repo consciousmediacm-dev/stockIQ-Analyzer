@@ -23,6 +23,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 import requests  # noqa: E402
 
+sys.path.insert(0, str(Path(__file__).parent))
+
+from _common import update_manifest  # noqa: E402
 from stockiq.backend.data.universe import UNIVERSE_FILE, parse_av_listing, parse_nasdaq_traded  # noqa: E402
 
 NASDAQ_TRADED_URL = "https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqtraded.txt"
@@ -64,7 +67,10 @@ def main() -> int:
         "securities": df.to_dict(orient="records"),
     }
     UNIVERSE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    UNIVERSE_FILE.write_text(json.dumps(payload, indent=1), encoding="utf-8")
+    tmp = UNIVERSE_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(payload, indent=1), encoding="utf-8")
+    tmp.replace(UNIVERSE_FILE)
+    update_manifest(UNIVERSE_FILE.name, count=len(df), source=source, **payload["counts"])
     print(f"Wrote {len(df):,} securities to {UNIVERSE_FILE} ({payload['counts']})")
     return 0
 
