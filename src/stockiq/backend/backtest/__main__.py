@@ -21,7 +21,15 @@ from stockiq.backend.backtest.report import write_report
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Backtest the app's buy/sell signals")
-    ap.add_argument("--tickers", type=int, default=50, help="first N tickers of the SPX universe")
+    ap.add_argument("--tickers", type=int, default=50, help="first N tickers of the universe")
+    ap.add_argument("--universe", default="sp500",
+                    choices=["sp500", "nasdaq100", "us_equities", "us_etfs", "us_all"],
+                    help="ticker universe (us_* needs cache/screener/universe.json)")
+    ap.add_argument("--sample", type=int, default=0,
+                    help="random sample of N tickers from the universe instead of the first N")
+    ap.add_argument("--seed", type=int, default=7)
+    ap.add_argument("--min-dollar-vol", type=float, default=0.0,
+                    help="skip samples whose 20-day avg $ volume at the signal date is below this")
     ap.add_argument("--symbols", nargs="*", help="explicit ticker list (overrides --tickers)")
     ap.add_argument("--years", type=float, default=10, help="evaluation window in years")
     ap.add_argument("--horizons", type=int, nargs="*", default=list(DEFAULT_HORIZONS))
@@ -36,8 +44,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.symbols:
         tickers = [s.upper() for s in args.symbols]
     else:
-        from stockiq.backend.config import SPX_TICKERS
-        tickers = SPX_TICKERS[: args.tickers]
+        import random
+
+        from stockiq.backend.data.universe import get_universe
+        pool = get_universe(args.universe)
+        if not pool:
+            print(f"Universe {args.universe!r} is empty — build cache/screener/universe.json first.")
+            return 1
+        tickers = (random.Random(args.seed).sample(pool, min(args.sample, len(pool)))
+                   if args.sample else pool[: args.tickers])
 
     wanted = sorted(set(tickers) | {args.benchmark})
     if args.csv_dir:
@@ -52,7 +67,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     start = pd.Timestamp.today().normalize() - pd.DateOffset(days=int(args.years * 365.25))
-    result = run_backtest(universe, bench, tuple(args.horizons), start=start, step=args.step)
+    result = run_backtest(universe, bench, tuple(args.horizons), start=start, step=args.step,
+                          min_dollar_vol=args.min_dollar_vol)
     if result["events"].empty:
         print(f"No scorable bars — need ≥ {WARMUP_YEARS} years of warm-up history before the window.")
         return 1
