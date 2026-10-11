@@ -1,10 +1,15 @@
 """Bounce radar screener — SPX stocks near their 200-day MA."""
 
+import logging
+
 from ._shared import (
     ttl_cache, CACHE_TTL, SPX_TICKERS,
     np, pd, datetime, timedelta,
     get_metadata, _batch_download, _rsi_last,
 )
+from stockiq.backend.models.signals import bounce_score
+
+logger = logging.getLogger(__name__)
 
 
 @ttl_cache(CACHE_TTL["fetch_spx_bounce_radar_scan"])
@@ -39,7 +44,8 @@ def fetch_spx_bounce_radar_scan(threshold_pct: float = 5.0, top_n: int = 30) -> 
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.get_level_values(0)
             return df.dropna(subset=["Close"])
-        except Exception:
+        except Exception as exc:
+            logger.debug("no frame for %s: %s", ticker, exc)
             return pd.DataFrame()
 
     for ticker in SPX_TICKERS:
@@ -62,10 +68,7 @@ def fetch_spx_bounce_radar_scan(threshold_pct: float = 5.0, top_n: int = 30) -> 
             rsi   = _rsi_last(df)
             trend = "📈 Uptrend" if ma50 > ma200 else "📉 Downtrend"
 
-            proximity_bonus = (threshold_pct - abs(dist_pct)) * 2
-            oversold_bonus  = max(0, 50 - rsi)
-            support_bonus   = 8 if dist_pct < 0 else 0
-            bounce_score    = proximity_bonus + oversold_bonus + support_bonus
+            score = bounce_score(dist_pct, rsi, threshold_pct)
 
             if rsi <= 30:
                 rsi_label = "🟢 Oversold"
@@ -86,9 +89,10 @@ def fetch_spx_bounce_radar_scan(threshold_pct: float = 5.0, top_n: int = 30) -> 
                 "RSI":          round(rsi, 1),
                 "RSI Zone":     rsi_label,
                 "Trend":        trend,
-                "Bounce Score": round(bounce_score, 1),
+                "Bounce Score": round(score, 1),
             })
-        except Exception:
+        except Exception as exc:
+            logger.debug("%s skipped: %s", ticker, exc)
             continue
 
     if not results:

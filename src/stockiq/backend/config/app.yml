@@ -8,6 +8,8 @@ quote:
   # Available providers:
   #   yahoo  — Yahoo Finance fast_info (near-real-time, may be blocked on server IPs)
   #   cboe   — CBOE CDN (15-min delayed, always reachable; no 52w high/low)
+  #   alphavantage — Alpha Vantage GLOBAL_QUOTE (needs ALPHA_VANTAGE_API_KEY; end-of-day on
+  #                  free keys, realtime/delayed entitlement on premium)
   spy_providers: [yahoo, cboe]
 
 options:
@@ -19,3 +21,13 @@ options:
   #   yahoo  — Yahoo Finance (real-time during market hours, may be blocked on server IPs)
   #   cboe   — CBOE CDN     (15-min delayed, always reachable, official source)
   spy_providers: [cboe, yahoo]
+
+history:
+  # Provider order for daily OHLCV history (analyzer, screeners, backtests).
+  # Tickers the first provider can't serve fall through to the next.
+  #
+  # Available providers:
+  #   yahoo         — Yahoo Finance via yfinance (free, unofficial, may be blocked on server IPs)
+  #   alphavantage  — Alpha Vantage (needs ALPHA_VANTAGE_API_KEY; set ALPHA_VANTAGE_PREMIUM=true
+  #                   on a paid plan for split-adjusted data and higher rate limits)
+  providers: [yahoo, alphavantage]

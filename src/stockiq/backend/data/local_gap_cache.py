@@ -6,16 +6,23 @@ recent 2-3 trading days (e.g. after a market holiday).  Once a gap date has 3
 trading sessions of data after it, its fill status is permanent — we cache it
 so the table never regresses to ⏳ Pending on a later load.
 
-Cache location: ~/.stockiq/gap_cache.json
+Cache location: $STOCKIQ_DATA_DIR (default ~/.stockiq)/gap_cache.json
 """
 
+import logging
+
 import json
+import os
+import threading
 from datetime import date, timedelta
-from pathlib import Path
 
 import pandas as pd
 
-_CACHE_FILE = Path.home() / ".stockiq" / "gap_cache.json"
+from stockiq.backend.cache import DATA_DIR
+
+logger = logging.getLogger(__name__)
+
+_CACHE_FILE = DATA_DIR / "gap_cache.json"
 _KEEP_DAYS  = 30
 
 
@@ -24,13 +31,17 @@ def _load_raw() -> dict:
         return {}
     try:
         return json.loads(_CACHE_FILE.read_text())
-    except Exception:
+    except Exception as exc:
+        logger.warning("_load_raw failed: %s", exc)
         return {}
 
 
 def _save_raw(data: dict) -> None:
+    """Atomic write — concurrent sessions can never leave a half-written file."""
     _CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _CACHE_FILE.write_text(json.dumps(data, indent=2))
+    tmp = _CACHE_FILE.with_suffix(f".{os.getpid()}.{threading.get_ident()}.tmp")
+    tmp.write_text(json.dumps(data, indent=2))
+    os.replace(tmp, _CACHE_FILE)
 
 
 def _prune(entries: dict) -> dict:

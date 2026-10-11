@@ -20,25 +20,38 @@ logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 logger = logging.getLogger(__name__)
 
 
-def _batch_download(tickers: list[str], **kwargs) -> pd.DataFrame:
+def _batch_download(
+    tickers: list[str],
+    start: str | None = None,
+    end: str | None = None,
+    group_by: str = "column",
+    **_yf_kwargs,
+) -> pd.DataFrame:
     """
-    Wrapper around yf.download with partial-fail logging.
-    Returns empty DataFrame on total failure; logs missing tickers on partial failure.
+    Batch daily OHLCV for many tickers via the provider chain (Yahoo → Alpha Vantage),
+    shaped like yf.download so existing screeners work unchanged:
+      group_by="ticker" → columns (ticker, field); otherwise (field, ticker).
+    `end` is inclusive. Returns an empty DataFrame on total failure and logs
+    tickers missing on partial failure. Extra yfinance kwargs are accepted and ignored.
     """
-    try:
-        raw = yf.download(tickers, **kwargs)
-        if raw.empty:
-            logger.warning("yf.download returned empty for %d tickers", len(tickers))
-        else:
-            if isinstance(raw.columns, pd.MultiIndex) and "Close" in raw.columns.get_level_values(0):
-                available = set(raw["Close"].columns[raw["Close"].notna().any()])
-                missing   = set(tickers) - available
-                if missing:
-                    logger.warning("yf.download missing data for: %s", sorted(missing))
-        return raw
-    except Exception as exc:
-        logger.warning("yf.download failed (%s) for %d tickers", exc, len(tickers))
+    from datetime import date as _date
+
+    from stockiq.backend.data.providers import get_daily_history
+
+    start_d = pd.Timestamp(start).date() if start else _date.today() - timedelta(days=365)
+    end_d   = pd.Timestamp(end).date() if end else _date.today()
+    data = get_daily_history(list(tickers), start_d, end_d)
+    if not data:
+        logger.warning("No price data for %d tickers", len(tickers))
         return pd.DataFrame()
+    missing = set(tickers) - set(data)
+    if missing:
+        logger.warning("Missing price data for: %s", sorted(missing))
+
+    frame = pd.concat(data, axis=1)
+    if group_by != "ticker":
+        frame = frame.swaplevel(axis=1).sort_index(axis=1)
+    return frame
 
 
 def _rsi_last(df: pd.DataFrame) -> float:

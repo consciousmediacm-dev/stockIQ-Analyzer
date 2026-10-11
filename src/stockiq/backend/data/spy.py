@@ -2,6 +2,7 @@
 
 import logging
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import requests
@@ -9,6 +10,8 @@ import yfinance as yf
 
 from stockiq.backend.cache import ttl_cache
 from stockiq.backend.config import CACHE_TTL
+
+logger = logging.getLogger(__name__)
 
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
@@ -36,6 +39,19 @@ def _pcr_signal(ratio: float) -> tuple[str, str]:
     return "Extreme Greed — contrarian bearish",     "#EF4444"
 
 
+def _cboe_ts(ts_str: str) -> int:
+    """
+    CBOE's last_trade_time is US/Eastern wall-clock time with no offset. Parsing it
+    as naive local time made it look hours stale on UTC servers, so the "freshest
+    quote wins" comparison in get_spy_quote() always picked Yahoo.
+    """
+    try:
+        naive = datetime.strptime(ts_str, "%Y-%m-%dT%H:%M:%S")
+    except (TypeError, ValueError):
+        return 0
+    return int(naive.replace(tzinfo=ZoneInfo("America/New_York")).timestamp())
+
+
 # ── Quote & price history ──────────────────────────────────────────────────────
 
 @ttl_cache(CACHE_TTL["fetch_spx_quote"])
@@ -60,7 +76,8 @@ def fetch_spx_quote() -> dict:
             "w52_low":    float(info.get("fiftyTwoWeekLow")  or 0),
             "_ts":        int(  info.get("regularMarketTime") or 0),
         }
-    except Exception:
+    except Exception as exc:
+        logger.warning("fetch_spx_quote failed: %s", exc)
         return {}
 
 
@@ -75,11 +92,7 @@ def fetch_spx_quote_cboe() -> dict:
         prev  = float(d.get("prev_day_close") or 0)
         if not price:
             return {}
-        ts_str = d.get("last_trade_time") or ""
-        try:
-            ts = int(datetime.strptime(ts_str, "%Y-%m-%dT%H:%M:%S").timestamp())
-        except Exception:
-            ts = 0
+        ts = _cboe_ts(d.get("last_trade_time") or "")
         return {
             "price":      price,
             "prev_close": prev,
@@ -93,7 +106,22 @@ def fetch_spx_quote_cboe() -> dict:
             "w52_low":    None,
             "_ts":        ts,
         }
-    except Exception:
+    except Exception as exc:
+        logger.warning("fetch_spx_quote_cboe failed: %s", exc)
+        return {}
+
+
+@ttl_cache(CACHE_TTL["fetch_spx_quote_cboe"])
+def fetch_spx_quote_alphavantage() -> dict:
+    """SPY quote from Alpha Vantage GLOBAL_QUOTE (needs ALPHA_VANTAGE_API_KEY). Returns {} on error."""
+    from stockiq.backend.data.providers import get_provider
+    provider = get_provider("alphavantage")
+    if not provider.is_configured():
+        return {}
+    try:
+        return provider.quote("SPY")
+    except Exception as exc:
+        logging.getLogger(__name__).warning("alphavantage quote failed: %s", exc)
         return {}
 
 
@@ -120,7 +148,8 @@ def fetch_spx_intraday(period: str = "1d", interval: str = "5m") -> pd.DataFrame
         if df.empty or "Close" not in df.columns:
             return pd.DataFrame()
         return df.dropna(subset=["Close"])
-    except Exception:
+    except Exception as exc:
+        logger.warning("fetch_spx_intraday failed: %s", exc)
         return pd.DataFrame()
 
 
@@ -142,7 +171,8 @@ def fetch_spy_options_data(expiration: str = "") -> dict | None:
         exp   = expiration if expiration in all_exps else all_exps[0]
         chain = ticker.option_chain(exp)
         return {"calls": chain.calls, "puts": chain.puts, "expiration": exp, "expirations": all_exps}
-    except Exception:
+    except Exception as exc:
+        logger.warning("fetch_spy_options_data failed: %s", exc)
         return None
 
 
@@ -204,7 +234,8 @@ def fetch_put_call_ratio(scope: str = "daily") -> dict | None:
             "exp_nearest":  expirations[0],
             "exp_farthest": expirations[-1],
         }
-    except Exception:
+    except Exception as exc:
+        logger.warning("fetch_put_call_ratio failed: %s", exc)
         return None
 
 
@@ -242,7 +273,8 @@ def _parse_cboe_options() -> list[dict] | None:
                 "impliedVolatility": float(opt.get("iv", 0) or 0),
             })
         return rows or None
-    except Exception:
+    except Exception as exc:
+        logger.warning("_parse_cboe_options failed: %s", exc)
         return None
 
 

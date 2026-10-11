@@ -4,7 +4,6 @@ on:
   push:
     branches: [develop, main]
   pull_request:
-    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -30,10 +29,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
-      - name: Install dependencies
+      - name: Install dependencies (pinned by constraints.txt)
         run: |
           python -m pip install --upgrade pip setuptools
-          pip install -e .
+          pip install -c constraints.txt -e .
           pip install pytest pytest-cov
 
       - name: Run tests
@@ -74,8 +73,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install ruff
 
-      - name: Run ruff
-        run: ruff check src/ tests/ --select=E,W,F --ignore=E501,W291,W293
+      - name: Run ruff (whole repo — app.py and cache scripts included)
+        run: ruff check .
 
   streamlit-smoke:
     name: Streamlit import smoke test
@@ -94,17 +93,37 @@ jobs:
       - name: Install package
         run: |
           python -m pip install --upgrade pip setuptools
-          pip install -e .
+          pip install -c constraints.txt -e .
 
-      - name: Verify core modules import cleanly
+      - name: Verify every backend module imports cleanly
         env:
           ANTHROPIC_API_KEY: dummy-key-for-ci
         run: |
           python -c "
-          from stockiq.backend.config import MA_PERIODS
-          from stockiq.backend.models.indicators import compute_mas
-          from stockiq.backend.models.signals import signal_score
-          from stockiq.frontend.views.components.charts import build_chart
-          from stockiq.backend.data.yf_fetch import fetch_ohlcv
-          print('All core modules imported OK')
+          import importlib, pkgutil, stockiq.backend as b
+          mods = [m.name for m in pkgutil.walk_packages(b.__path__, 'stockiq.backend.') if not m.name.endswith('__main__')]
+          for m in mods:
+              importlib.import_module(m)
+          print(f'{len(mods)} backend modules imported OK')
           "
+
+  docker:
+    name: Docker image builds and serves
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t stockiq:ci .
+
+      - name: Start container and wait for health endpoint
+        run: |
+          docker run -d --name stockiq -p 8501:8501 stockiq:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8501/_stcore/health; then echo " — healthy"; exit 0; fi
+            sleep 2
+          done
+          docker logs stockiq
+          exit 1

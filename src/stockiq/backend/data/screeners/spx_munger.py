@@ -1,10 +1,14 @@
 """Munger-style fundamental quality screener for SPX_TICKERS."""
 
+import logging
+
 from ._shared import (
     ttl_cache, CACHE_TTL, SPX_TICKERS,
     np, pd, yf, datetime, timedelta,
     get_metadata, get_fundamentals, _batch_download, _rsi_last,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _quality_score(info: dict) -> tuple[float, list[str]]:
@@ -103,7 +107,8 @@ def fetch_spx_munger_scan(
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.get_level_values(0)
             return df.dropna(subset=["Close"])
-        except Exception:
+        except Exception as exc:
+            logger.debug("no frame for %s: %s", ticker, exc)
             return pd.DataFrame()
 
     for ticker in SPX_TICKERS:
@@ -152,7 +157,8 @@ def fetch_spx_munger_scan(
                 "Munger Score":  round(munger_score, 1),
                 "Breakdown":     " | ".join(breakdown),
             })
-        except Exception:
+        except Exception as exc:
+            logger.debug("%s skipped: %s", ticker, exc)
             continue
 
     if not results:

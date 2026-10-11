@@ -1,11 +1,13 @@
 """Shared AI 10-day SPY forecast view — used by spy_dashboard and spy_gap_table."""
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
 
 from stockiq.backend.services.ai_forecast_service import (
+    ForecastValidationError,
     get_ai_forecast,
     get_app_key,
     get_market_status,
@@ -142,8 +144,7 @@ def render_ai_forecast(gaps_df: pd.DataFrame, quote: dict, show_share_btn: bool 
         )
         return
 
-    et     = timezone(timedelta(hours=-4))
-    now_et = datetime.now(et)
+    now_et = datetime.now(ZoneInfo("America/New_York"))   # handles EST/EDT
 
     # ── Gate: only call the API when the user explicitly requests it ──────────
     cache_key = f"{now_et.strftime('%Y-%m-%d-%H')}-{provider}"
@@ -171,9 +172,17 @@ def render_ai_forecast(gaps_df: pd.DataFrame, quote: dict, show_share_btn: bool 
     with st.spinner(f"Generating AI forecast via {prov_info['label']}…"):
         try:
             predictions = get_ai_forecast(gaps_df, provider=provider, user_key=user_key, cache_key=cache_key)
+        except ForecastValidationError as e:
+            st.error(
+                f"{prov_info['label']} returned an invalid forecast twice, so it was discarded "
+                "rather than shown. Try again or pick another provider."
+            )
+            with st.expander("What was wrong"):
+                st.markdown("\n".join(f"- {err}" for err in e.errors[:10]))
+            return
         except Exception as e:
             err = str(e)
-            if "429" in err or "402" in err or "Payment Required" in err or "RESOURCE_EXHAUSTED" in err or "quota" in err.lower() or "rate" in err.lower():
+            if "429" in err or "402" in err or "Payment Required" in err or "RESOURCE_EXHAUSTED" in err or "quota" in err.lower() or "rate limit" in err.lower() or "rate_limit" in err.lower():
                 st.markdown("""
 <div style="
     background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
@@ -186,38 +195,11 @@ def render_ai_forecast(gaps_df: pd.DataFrame, quote: dict, show_share_btn: bool 
     <div style="font-size:1.5rem; margin-bottom:8px;">⚠️ Free Tier Quota Reached</div>
     <div style="color:#CBD5E1; font-size:0.95rem; line-height:1.6; margin-bottom:16px;">
         The <strong style="color:#F8FAFC;">free API quota</strong> for this AI provider has been exhausted
-        for today. StockIQ is a free, open-source tool — shared API quotas run out quickly with many users.
+        for today — shared API quotas run out quickly with many users.
     </div>
     <div style="color:#94A3B8; font-size:0.9rem; line-height:1.6; margin-bottom:20px;">
         💡 <strong style="color:#F8FAFC;">Quick fix:</strong> Switch to a different provider above,
         or add your own API key to get a dedicated free quota.
-    </div>
-    <div style="
-        background: #0F172A;
-        border: 1px solid #334155;
-        border-radius: 8px;
-        padding: 16px 20px;
-    ">
-        <div style="font-size:1rem; font-weight:700; color:#F1C40F; margin-bottom:6px;">
-            ❤️ Help keep StockIQ free for everyone
-        </div>
-        <div style="color:#CBD5E1; font-size:0.875rem; line-height:1.6; margin-bottom:14px;">
-            Your sponsorship directly funds API costs, server capacity, and new features —
-            so more traders can access professional-grade analysis without paying a subscription.
-        </div>
-        <a href="https://buymeacoffee.com/mamuninfo" target="_blank" rel="noopener noreferrer"
-           style="
-               display: inline-block;
-               background: #FFDD00;
-               color: #0F172A;
-               font-weight: 700;
-               font-size: 0.9rem;
-               padding: 10px 24px;
-               border-radius: 6px;
-               text-decoration: none;
-           ">
-            ☕ Buy Me a Coffee
-        </a>
     </div>
 </div>
 """, unsafe_allow_html=True)

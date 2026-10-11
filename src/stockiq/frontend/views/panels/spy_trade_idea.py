@@ -104,7 +104,7 @@ def render_spy_trade_idea(
     _gap_src   = "Gap fill" + (" · " + " · ".join(_gap_parts) if _gap_parts else "")
     gap_html   = _level_html(gap_fill, gap_fill_pct, _gap_src, "#F59E0B") if show_gap else ""
 
-    mp_warn   = (f'<div style="font-size:0.72rem;color:#F59E0B;margin-top:5px">⚠ Max pain may act as friction before target</div>' if mp_headwind else "")
+    mp_warn   = ('<div style="font-size:0.72rem;color:#F59E0B;margin-top:5px">⚠ Max pain may act as friction before target</div>' if mp_headwind else "")
     hold_html = (f'<div style="font-size:0.72rem;color:#94A3B8;margin-top:5px">⟳ {hold_note}</div>' if hold_note else "")
     gap_row   = (
         f'<div style="margin-top:6px">'

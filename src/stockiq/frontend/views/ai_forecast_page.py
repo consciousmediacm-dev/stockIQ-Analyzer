@@ -1,5 +1,6 @@
 import streamlit as st
 
+from stockiq.backend.services.ai_forecast_service import get_forecast_track_record
 from stockiq.backend.services.spy_service import get_spy_gap_table_data
 from stockiq.frontend.views.panels.ai_forecast import render_ai_forecast
 
@@ -38,6 +39,24 @@ def render_ai_forecast_page() -> None:
         return
 
     render_ai_forecast(gap_data["gaps_df"], gap_data["quote"], show_share_btn=False)
+    _render_track_record()
+
+
+def _render_track_record() -> None:
+    with st.expander("📊 Track record — are these forecasts any good?"):
+        st.caption(
+            "Every generated forecast is logged and scored against SPY's actual closes. "
+            "Compare **direction hit %** with **always-up hit %**, and **close error %** with "
+            "**no-change error %** — if the AI can't beat those naive baselines, treat it as commentary, not signal."
+        )
+        record = get_forecast_track_record()
+        if record["table"].empty:
+            n = record["forecasts"]
+            st.info(f"{n} forecast(s) logged, none old enough to score yet." if n else
+                    "No forecasts logged yet on this server.")
+            return
+        st.dataframe(record["table"], hide_index=True, width="stretch")
+        st.caption("History lives in STOCKIQ_DATA_DIR/forecasts.jsonl — it resets on hosts without persistent disk.")
 
 
 render_ai_forecast_page()

@@ -12,14 +12,16 @@ from pathlib import Path
 import streamlit as st
 import yaml
 
+from stockiq.brand import APP_NAME, SITE_URL, brand
+
 # ── Load config ────────────────────────────────────────────────────────────────
 _seo_path = Path(__file__).parent.parent.parent.parent.parent / "config" / "seo.yml"
-with open(_seo_path) as _f:
-    _s: dict = yaml.safe_load(_f)
+_s: dict = yaml.safe_load(brand(_seo_path.read_text(encoding="utf-8")))
 
 _site        = _s["site"]
+_site["name"] = APP_NAME
 _TITLE       = _site["title"]
-_URL         = _site["url"]
+_URL         = SITE_URL or _site.get("url", "")
 _IMAGE       = _site["image"]
 _DESCRIPTION = _s["description"].strip().replace("\n", " ")
 _KEYWORDS    = ", ".join(_s["keywords"])
@@ -105,6 +107,11 @@ def inject_seo() -> None:
         ("name",     "twitter:image",      _IMAGE),
     ]
 
+    # Drop tags that depend on not-yet-configured values (site URL, preview image)
+    if not _IMAGE:
+        meta_rows = [r for r in meta_rows if "image" not in r[1]]
+    meta_rows = [r for r in meta_rows if r[2]]
+
     js_calls = []
     for attr, key, val in meta_rows:
         safe = val.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ")
@@ -151,7 +158,7 @@ def inject_seo() -> None:
 
   function run() {{
 {chr(10).join(js_calls)}
-    upsertCanonical("{_URL}");
+    {f'upsertCanonical("{_URL}");' if _URL else ""}
     document.title = "{_TITLE}";
     upsertJsonLd(`{json_ld_str}`);
   }}

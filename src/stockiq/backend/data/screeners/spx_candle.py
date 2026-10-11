@@ -1,10 +1,15 @@
 """Weekly/monthly candle momentum screener for SPX_TICKERS."""
 
+import logging
+
 from ._shared import (
     ttl_cache, CACHE_TTL, SPX_TICKERS,
     pd, yf, datetime, timedelta,
     get_metadata, _batch_download, _rsi_last,
 )
+from stockiq.backend.models.signals import candle_momentum_signal
+
+logger = logging.getLogger(__name__)
 
 
 @ttl_cache(CACHE_TTL["fetch_spx_candle_momentum_scan"])
@@ -48,7 +53,8 @@ def fetch_spx_candle_momentum_scan() -> pd.DataFrame:
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.get_level_values(0)
             return df.dropna(subset=["Close"])
-        except Exception:
+        except Exception as exc:
+            logger.debug("no frame for %s: %s", ticker, exc)
             return pd.DataFrame()
 
     spx_ret_1m = 0.0
@@ -107,16 +113,7 @@ def fetch_spx_candle_momentum_scan() -> pd.DataFrame:
             monthly_green = sum(1 for _, r in m4.iterrows() if r["Close"] > r["Open"])
             monthly_dots  = ["🟢" if r["Close"] > r["Open"] else "🔴" for _, r in m4.iterrows()]
 
-            if weekly_green == 4 and monthly_green == 4:
-                signal, sig_order = "🟢 Strong Buy", 1
-            elif weekly_green == 4 and monthly_green >= 3:
-                signal, sig_order = "🟢 Buy", 2
-            elif weekly_green >= 3 and monthly_green >= 3:
-                signal, sig_order = "🟡 Accumulate", 3
-            elif weekly_green >= 2:
-                signal, sig_order = "🟠 Caution", 4
-            else:
-                signal, sig_order = "🔴 Sell", 5
+            signal, sig_order = candle_momentum_signal(weekly_green, monthly_green)
 
             recommendations.append({
                 "Ticker":    ticker,
@@ -137,7 +134,8 @@ def fetch_spx_candle_momentum_scan() -> pd.DataFrame:
                 "_order":    sig_order,
                 "Strength":  weekly_green + monthly_green,
             })
-        except Exception:
+        except Exception as exc:
+            logger.debug("%s skipped: %s", ticker, exc)
             continue
 
     if not recommendations:

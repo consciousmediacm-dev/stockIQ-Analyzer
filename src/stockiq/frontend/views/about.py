@@ -1,11 +1,13 @@
 import pandas as pd
 import streamlit as st
 
+from stockiq.brand import APP_NAME
+
 
 def render_about_tab() -> None:
     st.title("ℹ️ About This Stock Analyzer")
-    st.markdown("""
-    **StockIQ** is a free technical analysis tool designed to help traders and investors
+    st.markdown(f"""
+    **{APP_NAME}** is a free technical analysis tool designed to help traders and investors
     make informed decisions with real-time data.
 
     **Key Features:**

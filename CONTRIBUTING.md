@@ -36,7 +36,7 @@ Thank you for your interest in contributing! StockIQ is a community-driven proje
 ```bash
 python -m venv .venv
 source .venv/bin/activate      # Windows: .venv\Scripts\activate
-pip install -e .               # installs stockiq package + all dependencies
+pip install -c constraints.txt -e .   # stockiq + dependencies at the versions CI uses
 pip install pytest pytest-cov ruff
 ```
 
@@ -44,7 +44,7 @@ Copy the Streamlit secrets template and add your API key:
 
 ```bash
 cp .streamlit/secrets.toml.example .streamlit/secrets.toml
-# then edit .streamlit/secrets.toml and set ANTHROPIC_API_KEY
+# then edit .streamlit/secrets.toml (or use .env — see .env.example)
 ```
 
 Run the app locally:
@@ -65,7 +65,7 @@ pytest
 pytest --cov=. --cov-report=term-missing
 
 # A single file
-pytest tests/test_indicators.py -v
+pytest tests/backend/models/test_indicators.py -v
 ```
 
 Tests live in `tests/`. Pure-logic tests mock all network calls — no live market data or API keys required.

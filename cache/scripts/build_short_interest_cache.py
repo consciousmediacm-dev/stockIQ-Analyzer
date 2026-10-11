@@ -12,12 +12,14 @@ Usage (from project root):
 Writes to: cache/screener/short_interest.json
 """
 
-import json
 import sys
 import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent))
+
+from _common import write_cache  # noqa: E402
 
 import yfinance as yf
 
@@ -70,9 +72,7 @@ def main() -> None:
     with_data = sum(1 for v in data.values() if v["shortPercentOfFloat"] > 0)
     print(f"\nFetched: {len(data)} tickers  ({with_data} with short interest data)")
 
-    _OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _OUTPUT_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"Saved → {_OUTPUT_FILE}")
+    write_cache(_OUTPUT_FILE, data, expected=len(tickers))
     print("Done. Refresh monthly to keep short interest data current.")
 
 

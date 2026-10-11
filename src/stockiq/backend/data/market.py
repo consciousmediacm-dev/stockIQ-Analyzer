@@ -8,6 +8,8 @@ import yfinance as yf
 from stockiq.backend.cache import ttl_cache
 from stockiq.backend.config import CACHE_TTL
 
+logger = logging.getLogger(__name__)
+
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
 
@@ -20,7 +22,8 @@ def fetch_vix_ohlc(period: str = "1y") -> pd.DataFrame:
             df.columns = df.columns.get_level_values(0)
         cols = ["Open", "High", "Low", "Close"] + (["Volume"] if "Volume" in df.columns else [])
         return df[cols].dropna(subset=["Close"])
-    except Exception:
+    except Exception as exc:
+        logger.warning("fetch_vix_ohlc failed: %s", exc)
         return pd.DataFrame()
 
 
@@ -38,7 +41,8 @@ def fetch_vix_history(period: str = "1y") -> pd.DataFrame:
             close = raw[["Close"]].copy()
         close.columns = [c.replace("^VIX", "VIX") for c in close.columns]
         return close.dropna()
-    except Exception:
+    except Exception as exc:
+        logger.warning("fetch_vix_history failed: %s", exc)
         return pd.DataFrame()
 
 
@@ -90,9 +94,11 @@ def fetch_index_snapshot() -> pd.DataFrame:
                     col = closes[sym].dropna()
                     if len(col) >= 2:
                         prices[sym] = (float(col.iloc[-1]), float(col.iloc[-2]))
-                except Exception:
+                except Exception as exc:
+                    logger.debug("fetch_index_snapshot failed: %s", exc)
                     continue
-        except Exception:
+        except Exception as exc:
+            logger.debug("fetch_index_snapshot failed: %s", exc)
             pass
 
     rows = []

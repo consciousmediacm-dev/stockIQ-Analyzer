@@ -6,24 +6,29 @@ readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
 dependencies = [
+    # Upper bounds at the next major version: a major release of any of these
+    # can change behaviour silently. constraints.txt pins the exact versions CI
+    # tests against — bump both together.
     "streamlit>=1.50,<2.0",
-    "yfinance>=0.2.30",
-    "plotly>=5.0",
-    "pandas>=2.0",
-    "numpy>=1.20",
-    "anthropic>=0.40.0",
-    "groq>=0.9.0",
-    "google-genai>=0.8.0",
-    "python-dotenv>=1.0.0",
-    "pyyaml>=6.0",
-    "requests>=2.28",
+    "yfinance>=0.2.30,<2.0",
+    "plotly>=5.0,<8.0",
+    "pandas>=2.0,<4.0",
+    "numpy>=1.20,<3.0",
+    "anthropic>=1.0,<2.0",
+    "groq>=0.9.0,<2.0",
+    "google-genai>=0.8.0,<3.0",
+    "python-dotenv>=1.0.0,<2.0",
+    "pyyaml>=6.0,<7.0",
+    "requests>=2.28,<3.0",
     "pyarrow>=15.0,<24.0",
+    "tabulate>=0.9,<1.0",
 ]
 
 [project.urls]
-Homepage    = "https://github.com/Mamun/stockIQ"
-Repository  = "https://github.com/Mamun/stockIQ"
-"Bug Tracker" = "https://github.com/Mamun/stockIQ/issues"
+Homepage    = "https://github.com/consciousmediacm-dev/stockIQ-Analyzer"
+Repository  = "https://github.com/consciousmediacm-dev/stockIQ-Analyzer"
+Upstream    = "https://github.com/Mamun/stockIQ"
+"Bug Tracker" = "https://github.com/consciousmediacm-dev/stockIQ-Analyzer/issues"
 
 [build-system]
 requires      = ["setuptools>=61"]
@@ -54,8 +59,8 @@ ignore = ["E501", "W291", "W293", "E402"]
 [tool.coverage.run]
 source = ["src"]
 omit = [
-    "src/stockiq/frontend/views/*",   # Streamlit page modules require a running server
-    "src/stockiq/seo.py",
+    "src/stockiq/frontend/views/*",   # exercised by tests/frontend/test_pages_smoke.py via AppTest,
+                                      # which coverage can't attribute (pages run via exec)
 ]
 
 [tool.coverage.report]

@@ -1,19 +1,15 @@
-# StockIQ — Free S&P 500 Technical Analysis & Screener
+# Stock Analyzer — Technical Analysis, Scanners & AI Market Outlook
 
-[![CI](https://github.com/Mamun/stockiq/actions/workflows/ci.yml/badge.svg)](https://github.com/Mamun/stockiq/actions/workflows/ci.yml)
+[![CI](https://github.com/consciousmediacm-dev/stockIQ-Analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/consciousmediacm-dev/stockIQ-Analyzer/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org)
 [![Streamlit](https://img.shields.io/badge/built%20with-Streamlit-FF4B4B)](https://streamlit.io)
-[![Live App](https://img.shields.io/badge/Live%20App-stpicker.streamlit.app-brightgreen)](https://stpicker.streamlit.app/)
-[![Sponsor](https://img.shields.io/badge/Sponsor-❤-pink)](https://github.com/sponsors/Mamun)
 
-> **StockIQ** is a free, open-source web app that gives retail investors institutional-grade technical analysis — moving averages, RSI, Fibonacci retracements, candlestick patterns, options intelligence, and AI-powered forecasts — without a Bloomberg terminal.
-
-## Try it now — no install needed
-
-**[https://stpicker.streamlit.app/](https://stpicker.streamlit.app/)**
-
-The live app runs on Streamlit Community Cloud and is free to use. No account or API key required.
+> A web app for technical analysis — moving averages, RSI, Fibonacci retracements, candlestick
+> patterns, options intelligence, market scanners, signal backtesting and AI-powered outlooks.
+>
+> Built on [StockIQ](https://github.com/Mamun/stockIQ) by Mamun (MIT licensed). The product name
+> and branding are configured in `config/brand.yml`.
 
 ---
 
@@ -89,8 +85,8 @@ Curated ETF categories — Retail Favorites, Semiconductors, Software — ranked
 ### Installation
 
 ```bash
-git clone https://github.com/Mamun/stockiq.git
-cd stockiq
+git clone https://github.com/consciousmediacm-dev/stockIQ-Analyzer.git
+cd stockIQ-Analyzer
 
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
@@ -112,6 +108,20 @@ OPENAI_API_KEY    = "sk-proj-..."    # platform.openai.com/api-keys
 ANTHROPIC_API_KEY = "sk-ant-..."     # console.anthropic.com/settings/keys
 ```
 
+Market data — Yahoo Finance is used by default (free, no key). Add Alpha Vantage as an
+automatic fallback (and for the all-US universe) with:
+
+```toml
+ALPHA_VANTAGE_API_KEY = "..."        # alphavantage.co/support/#api-key
+ALPHA_VANTAGE_PREMIUM = "true"       # paid plan: split-adjusted history + higher rate limits
+```
+
+The free Alpha Vantage tier is 25 requests/day and returns *unadjusted* prices, so it is only
+a last-resort fallback; a premium key is needed for real use. Provider order lives in
+`src/stockiq/backend/config/app.yml` (`history.providers`). Every response is validated
+(duplicates, bad prices, High/Low repairs, split-like jumps) and tickers one provider can't
+serve fall through to the next.
+
 Or set keys as environment variables:
 
 ```bash
@@ -126,6 +136,33 @@ streamlit run app.py
 
 Open [http://localhost:8501](http://localhost:8501) in your browser.
 
+### Docker
+
+```bash
+cp .env.example .env          # add whichever keys you have
+docker compose up --build     # → http://localhost:8501
+```
+
+The compose file mounts a volume at `/data` and uses the SQLite cache, so caches, the
+AI forecast track record and backtest prices survive restarts.
+
+### Environment variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `ALPHA_VANTAGE_API_KEY` | — | Market-data failover + all-US ticker universe |
+| `ALPHA_VANTAGE_PREMIUM` | `false` | `true` on a paid plan: adjusted history, higher rate limits |
+| `GROQ_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` | — | AI Outlook providers |
+| `STOCKIQ_MODEL_<PROVIDER>` | see `llm/providers.py` | Override a provider's model ID |
+| `STOCKIQ_DATA_DIR` | `~/.stockiq` | Caches, forecast log, backtest prices |
+| `STOCKIQ_CACHE_BACKEND` | `memory` | `sqlite` to keep caches across restarts |
+| `STOCKIQ_LOG_LEVEL` | `INFO` | Log verbosity |
+| `SCREENER_TICKER_COUNT` | `300` | Scan fewer tickers while developing |
+
+Templates: `.env.example` (local / Docker) and `.streamlit/secrets.toml.example` (Streamlit Cloud).
+**Info → System Status** in the app shows which keys are set, provider health, cache ages and
+recent warnings.
+
 ### Optional: limit screener scope
 
 The weekly/monthly screener scans the top 50 S&P 500 tickers by default. To speed up development:
@@ -137,16 +174,40 @@ streamlit run app.py
 
 ---
 
+## Backtesting the signals
+
+Every buy/sell label in the app can be replayed over history to see whether it actually worked.
+
+```bash
+python -m stockiq.backend.backtest --tickers 50 --years 10            # top 50 S&P names, 10 years
+python -m stockiq.backend.backtest --symbols AAPL MSFT --step 20      # non-overlapping 20-day samples
+python -m stockiq.backend.backtest --csv-dir ./vendor_prices          # TICKER.csv files from any vendor
+```
+
+The report (`reports/backtest/<date>/report.md` + CSVs) covers the Stock Analyzer signal score
+and each of its five components, RSI zones, the MA200 Bounce Radar and the Candle Screener, at
+5/20/60-day horizons: hit rate, mean/median return, excess return vs SPY, worst drawdown while
+holding (MAE) and a t-stat. A regression shows how much each score component really contributes.
+The same results are available in the app under **Research → Signal Backtest**.
+
+Entry is the next day's open (no look-ahead). Read the caveats at the top of every report —
+survivorship bias, overlapping windows and zero trading costs all flatter the results.
+Fundamentals-based scanners are not backtested because only a current snapshot is stored.
+
+---
+
 ## Running Tests
 
 ```bash
 pip install pytest pytest-cov
 pytest                                    # all tests
 pytest --cov=. --cov-report=term-missing  # with coverage
-pytest tests/test_indicators.py -v        # single file
+pytest tests/backend/models/test_indicators.py -v   # single file
 ```
 
-Tests are network-free — all `yfinance` calls are mocked.
+Tests are network-free — data calls are mocked, and `tests/frontend/test_pages_smoke.py`
+renders every page with sockets blocked to prove each one degrades gracefully when data
+sources are down.
 
 ---
 
@@ -165,7 +226,10 @@ Tests are network-free — all `yfinance` calls are mocked.
     ├── backend/
     │   ├── config/                 # Backend-only config (app.yml, cache.yml, TTLs, provider order)
     │   ├── models/                 # Pure data models (indicators, signals, options, spy context)
+    │   ├── backtest/               # Signal backtesting engine + CLI (python -m stockiq.backend.backtest)
     │   ├── data/
+    │   │   ├── providers/          # Market-data providers (Yahoo, Alpha Vantage), failover, validation
+    │   │   ├── universe.py         # Ticker universes (S&P, NASDAQ-100, all US stocks/ETFs)
     │   │   ├── spy.py              # SPY price, intraday bars, options chain, put/call ratio (Yahoo + CBOE)
     │   │   ├── market.py           # VIX/index snapshot helpers (TTL-cached)
     │   │   ├── yf_fetch.py         # yfinance OHLCV download & company search
@@ -179,8 +243,8 @@ Tests are network-free — all `yfinance` calls are mocked.
     │   │   ├── ai_forecast_service.py  # Multi-provider AI forecast composition
     │   │   ├── analyzer_service.py # Per-ticker technical analysis pipeline
     │   │   └── scanners/           # Scanner services (NASDAQ, SPX, ETF, pre-market)
-    │   ├── llm/                    # Multi-provider LLM wrappers (Groq, Gemini, DeepSeek, OpenAI, Anthropic)
-    │   └── cache.py                # TTL cache decorator
+    │   ├── llm/                    # LLM providers, forecast validation + retry, track record
+    │   └── cache.py                # TTL cache (thread-safe memory / SQLite backends)
     └── frontend/
         └── views/                  # Streamlit page modules (one file per page)
             └── components/         # Reusable UI components (charts, gap table, summary card)
@@ -212,7 +276,7 @@ Tests are network-free — all `yfinance` calls are mocked.
 | **Google** | Gemini 2.5 Flash | Yes | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
 | **DeepSeek** | DeepSeek-V3 | Pay-as-you-go (very cheap) | [platform.deepseek.com](https://platform.deepseek.com/api_keys) |
 | **OpenAI** | GPT-4.1 Mini | Pay-as-you-go | [platform.openai.com](https://platform.openai.com/api-keys) |
-| **Anthropic** | Claude Opus | Pay-as-you-go | [console.anthropic.com](https://console.anthropic.com/settings/keys) |
+| **Anthropic** | Claude Sonnet 5.5 | Pay-as-you-go | [console.anthropic.com](https://console.anthropic.com/settings/keys) |
 
 ---
 
@@ -226,26 +290,7 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before
 4. Run `pytest` and `ruff check .`
 5. Open a Pull Request
 
-See [good first issues](https://github.com/Mamun/stockiq/labels/good%20first%20issue) for a place to start.
-
----
-
-## Sponsoring StockIQ
-
-StockIQ is free and open source. Hosting, API costs, and development time are funded entirely by community support. If this tool saves you time or helps your trading research, please consider sponsoring:
-
-| Platform | Link |
-|----------|------|
-| **GitHub Sponsors** | [github.com/sponsors/Mamun](https://github.com/sponsors/Mamun) |
-| **Ko-fi** | [ko-fi.com/stockiq](https://ko-fi.com/stockiq) |
-| **Open Collective** | [opencollective.com/stockiq](https://opencollective.com/stockiq) |
-| **Buy Me a Coffee** | [buymeacoffee.com/mamuninfo](https://buymeacoffee.com/mamuninfo) |
-
-Your sponsorship helps keep the project free for everyone and funds:
-
-- AI provider API costs for the SPY Outlook feature
-- Ongoing data-quality improvements
-- New screeners and indicators requested by the community
+See [good first issues](https://github.com/consciousmediacm-dev/stockIQ-Analyzer/labels/good%20first%20issue) for a place to start.
 
 ---
 
@@ -262,10 +307,10 @@ Your sponsorship helps keep the project free for everyone and funds:
 
 ## License
 
-[MIT](LICENSE) © 2025 Mamun
+[MIT](LICENSE) © 2025 Mamun — original StockIQ project. Modifications in this fork are released under the same license.
 
 ---
 
 ## Disclaimer
 
-StockIQ is for **educational and informational purposes only**. Nothing on this site constitutes financial advice. Always do your own research before making investment decisions.
+This app is for **educational and informational purposes only**. Nothing on this site constitutes financial advice. Always do your own research before making investment decisions.

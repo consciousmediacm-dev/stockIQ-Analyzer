@@ -1,10 +1,14 @@
 """Short-squeeze screener for SPX_TICKERS."""
 
+import logging
+
 from ._shared import (
     ttl_cache, CACHE_TTL, SPX_TICKERS,
     np, pd, yf, datetime, timedelta,
     get_metadata, get_short_interest, _batch_download, _rsi_last,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @ttl_cache(CACHE_TTL["fetch_spx_squeeze_scan"])
@@ -45,7 +49,8 @@ def fetch_spx_squeeze_scan(
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.get_level_values(0)
             return df.dropna(subset=["Close"])
-        except Exception:
+        except Exception as exc:
+            logger.debug("no frame for %s: %s", ticker, exc)
             return pd.DataFrame()
 
     for ticker in SPX_TICKERS:
@@ -126,7 +131,8 @@ def fetch_spx_squeeze_scan(
                 "Short Chg % MoM": round(short_change_pct, 1),
                 "Squeeze Score":   round(squeeze_score, 1),
             })
-        except Exception:
+        except Exception as exc:
+            logger.debug("%s skipped: %s", ticker, exc)
             continue
 
     if not results:

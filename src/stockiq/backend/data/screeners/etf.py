@@ -1,10 +1,14 @@
 """ETF momentum/RSI/MA scanner."""
 
+import logging
+
 from ._shared import (
     ttl_cache, CACHE_TTL, ETF_UNIVERSE,
     np, pd, yf, datetime, timedelta,
     _rsi_last,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @ttl_cache(CACHE_TTL["fetch_etf_scan"])
@@ -40,7 +44,8 @@ def fetch_etf_scan(categories: tuple[str, ...] | None = None) -> pd.DataFrame:
             spy_close = spy_raw["Close"].dropna()
         if len(spy_close) >= 22:
             spy_ret_1m = (float(spy_close.iloc[-1]) - float(spy_close.iloc[-22])) / float(spy_close.iloc[-22]) * 100
-    except Exception:
+    except Exception as exc:
+        logger.debug("fetch_etf_scan failed: %s", exc)
         pass
 
     results = []
@@ -133,7 +138,8 @@ def fetch_etf_scan(categories: tuple[str, ...] | None = None) -> pd.DataFrame:
                 "Vol":         vol_surge,
                 "ETF Score":   round(score, 1),
             })
-        except Exception:
+        except Exception as exc:
+            logger.debug("%s skipped: %s", ticker, exc)
             continue
 
     if not results:

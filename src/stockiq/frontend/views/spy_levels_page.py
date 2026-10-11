@@ -2,7 +2,7 @@
 
 import streamlit as st
 
-from stockiq.backend.services.spy_service import get_spy_quote
+from stockiq.backend.services.spy_service import get_spy_quote, refresh_spy_data
 from stockiq.frontend.views.panels.spy_chart import _levels_table_html, compute_spy_levels
 
 
@@ -80,7 +80,7 @@ Green = level is above current price · Red = level is below.
         )
     with c2:
         if st.button("🔄 Refresh", use_container_width=True):
-            st.cache_data.clear()
+            refresh_spy_data()
             st.rerun()
 
 
