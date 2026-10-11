@@ -46,14 +46,25 @@ def render_spy_header(quote: dict, idx_df: pd.DataFrame) -> None:
 
     with indices_col:
         if not idx_df.empty:
-            cols = st.columns(len(idx_df))
-            for col, (_, row) in zip(cols, idx_df.iterrows()):
-                is_vix  = row["Index"] == "VIX"
-                price_s = f"{row['Price']:.2f}" if is_vix else f"{row['Price']:,.2f}"
-                delta_s = f"{row['Change']:+.2f} ({row['Change %']:+.2f}%)"
-                col.metric(
-                    label=row["Index"],
-                    value=price_s,
-                    delta=delta_s,
-                    delta_color="inverse" if is_vix else "normal",
-                )
+            st.markdown(_index_strip_html(idx_df), unsafe_allow_html=True)
+
+
+def _index_strip_html(idx_df: pd.DataFrame) -> str:
+    """Index cards that always show the full price (dollars and cents). Cards wrap to a
+    second row on narrow screens instead of truncating the number like st.metric does."""
+    cards = []
+    for _, row in idx_df.iterrows():
+        is_vix = row["Index"] == "VIX"
+        up = row["Change"] >= 0
+        good = (not up) if is_vix else up                     # VIX rising is bad news
+        clr = "#22C55E" if good else "#EF4444"
+        arrow = "▲" if up else "▼"
+        cards.append(
+            f'<div style="flex:1 1 150px;min-width:150px;padding:4px 6px">'
+            f'<div style="font-size:0.8rem;color:#94A3B8">{row["Index"]}</div>'
+            f'<div style="font-size:clamp(1.15rem,1.9vw,1.6rem);font-weight:600;white-space:nowrap;'
+            f'font-variant-numeric:tabular-nums">{row["Price"]:,.2f}</div>'
+            f'<div style="font-size:0.8rem;color:{clr};white-space:nowrap">{arrow} {row["Change"]:+,.2f} '
+            f'({row["Change %"]:+.2f}%)</div></div>'
+        )
+    return f'<div style="display:flex;flex-wrap:wrap;gap:4px 8px">{"".join(cards)}</div>'

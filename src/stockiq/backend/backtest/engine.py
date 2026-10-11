@@ -292,6 +292,37 @@ def summarize(events: pd.DataFrame, by: str, horizons=DEFAULT_HORIZONS, order: l
     return pd.DataFrame(rows).set_index("group")
 
 
+def ticker_breakdown(events: pd.DataFrame, by: str, group: str, horizon: int) -> pd.DataFrame:
+    """
+    The stocks behind one table row: per ticker, how many times it was in `group`
+    (a row label from summarize(), e.g. "Oversold (≤30)") and what happened over
+    the next `horizon` days. Sorted by most signals, then best excess return.
+    """
+    rows = events[events[by].astype(str) == group]
+    if group == "ALL (baseline)":
+        rows = events
+    out = []
+    for ticker, g in rows.groupby("ticker"):
+        r = g[f"ret_{horizon}"].dropna()
+        e = g[f"exc_{horizon}"].dropna()
+        m = g[f"mae_{horizon}"].dropna()
+        out.append({
+            "ticker": ticker,
+            "signals": len(g),
+            "last_signal": str(g.index.max().date()),
+            "hit%": round((r > 0).mean() * 100, 1) if len(r) else np.nan,
+            "avg_return%": round(r.mean() * 100, 2) if len(r) else np.nan,
+            "vs_SPY%": round(e.mean() * 100, 2) if len(e) else np.nan,
+            "beat_SPY%": round((e > 0).mean() * 100, 1) if len(e) else np.nan,
+            "avg_worst_dip%": round(m.mean() * 100, 2) if len(m) else np.nan,
+        })
+    if not out:
+        return pd.DataFrame(columns=["ticker", "signals", "last_signal", "hit%", "avg_return%",
+                                     "vs_SPY%", "beat_SPY%", "avg_worst_dip%"])
+    df = pd.DataFrame(out)
+    return df.sort_values(["signals", "vs_SPY%"], ascending=[False, False], na_position="last").reset_index(drop=True)
+
+
 def component_regression(events: pd.DataFrame, horizon: int) -> pd.DataFrame:
     """
     OLS of excess return on the five score components (with intercept).
@@ -336,20 +367,19 @@ def run_backtest(
     if events.empty:
         return {"events": events, "tables": {}, "regression": {}, "meta": {"tickers": 0, "rows": 0}}
 
-    tables = {
-        "Signal score label (Stock Analyzer card)": summarize(events, "label", horizons, SCORE_LABEL_ORDER),
-        "Signal score (raw −8 … +8)": summarize(events, "score", horizons),
-    }
-    for c in COMPONENTS:
-        tables[f"Component · {c}"] = summarize(events, c, horizons)
-    tables["RSI zone (NASDAQ RSI Scanner)"] = summarize(events, "rsi_zone", horizons)
-    tables["MA200 Bounce Radar (±5%)"] = summarize(events, "bounce_radar", horizons)
-    tables["MA200 Bounce Radar · top 30 per day"] = summarize(events, "bounce_top30", horizons)
-    tables["Buying Pressure (BX) · weekly"] = summarize(events, "bx_weekly", horizons, BX_LABELS)
-    tables["Buying Pressure (BX) · monthly"] = summarize(events, "bx_monthly", horizons, BX_LABELS)
-    tables["Candle Screener signal"] = summarize(
-        events, "candle_signal", horizons, [lbl for lbl, _ in CANDLE_SIGNALS]
-    )
+    specs = [
+        ("Signal score label (Stock Analyzer card)", "label", SCORE_LABEL_ORDER),
+        ("Signal score (raw −8 … +8)", "score", None),
+        *[(f"Component · {c}", c, None) for c in COMPONENTS],
+        ("RSI zone (NASDAQ RSI Scanner)", "rsi_zone", None),
+        ("MA200 Bounce Radar (±5%)", "bounce_radar", None),
+        ("MA200 Bounce Radar · top 30 per day", "bounce_top30", None),
+        ("Buying Pressure (BX) · weekly", "bx_weekly", BX_LABELS),
+        ("Buying Pressure (BX) · monthly", "bx_monthly", BX_LABELS),
+        ("Candle Screener signal", "candle_signal", [lbl for lbl, _ in CANDLE_SIGNALS]),
+    ]
+    tables = {title: summarize(events, col, horizons, order) for title, col, order in specs}
+    group_cols = {title: col for title, col, _ in specs}
 
     regression = {h: component_regression(events, h) for h in horizons}
     meta = {
@@ -362,4 +392,4 @@ def run_backtest(
         "min_dollar_vol": min_dollar_vol,
         "benchmark": benchmark is not None and not benchmark.empty,
     }
-    return {"events": events, "tables": tables, "regression": regression, "meta": meta}
+    return {"events": events, "tables": tables, "group_cols": group_cols, "regression": regression, "meta": meta}

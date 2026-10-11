@@ -25,6 +25,12 @@ PRESETS = {
 }
 DEFAULTS = {"mode": "dark", "bg": PRESETS["dark"]["bg"], "accent": "#22C55E", "font_px": 16}
 
+# Always applied: metric numbers show in full (shrink to fit) instead of being cut off with "…".
+BASE_CSS = """
+[data-testid="stMetricValue"] { font-size: clamp(1.1rem, 2vw, 2.25rem); }
+[data-testid="stMetricValue"] > div { overflow: visible; text-overflow: clip; white-space: nowrap; }
+"""
+
 _HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
 
@@ -181,8 +187,7 @@ def render_appearance_panel() -> None:
             "font_px": st.session_state.appearance_font,
         })
         st.session_state.appearance = s
-        if s != DEFAULTS:
-            st.html(f"<style>{build_css(s)}</style>")
+        st.html(f"<style>{BASE_CSS}{build_css(s) if s != DEFAULTS else ''}</style>")
         if s != st.session_state.get("appearance_saved"):
             _save_cookie(s)
             st.session_state.appearance_saved = dict(s)

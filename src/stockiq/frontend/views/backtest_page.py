@@ -1,7 +1,7 @@
 import streamlit as st
 
 from stockiq.backend.config import SPX_TICKERS
-from stockiq.backend.services.backtest_service import run_signal_backtest
+from stockiq.backend.services.backtest_service import run_signal_backtest, stocks_behind_row
 
 _PRESETS = {
     "Top 25 S&P 500": SPX_TICKERS[:25],
@@ -16,6 +16,36 @@ def _highlight_baseline(df):
         if r.name == "ALL (baseline)" else [""] * len(r),
         axis=1,
     )
+
+
+def _render_stocks_behind(result: dict, title: str, groups: list[str], horizon: int) -> None:
+    """Expander listing the individual stocks (symbol + company) behind one table row."""
+    with st.expander(f"🔎 Stocks behind a row · {title}"):
+        group = st.selectbox("Row", groups, key=f"bt_row_{title}",
+                             help="Every stock that was in this group on a sampled date, and how it did "
+                                  f"over the next {horizon} trading days.")
+        df = stocks_behind_row(result, title, group, horizon)
+        if df.empty:
+            st.caption("No stocks in this row.")
+            return
+        st.caption(f"{len(df)} stocks · **signals** = sampled dates in this row · "
+                   f"**vs SPY** = average return minus SPY's over the same {horizon} days · "
+                   "**avg worst dip** = average largest drop while holding")
+        st.dataframe(
+            df, hide_index=True, width="stretch", height=min(420, 38 + 35 * len(df)),
+            column_config={
+                "ticker": st.column_config.TextColumn("Symbol"),
+                "company": st.column_config.TextColumn("Company"),
+                "sector": st.column_config.TextColumn("Sector"),
+                "signals": st.column_config.NumberColumn("Signals"),
+                "last_signal": st.column_config.TextColumn("Last signal"),
+                "hit%": st.column_config.NumberColumn("Up %", format="%.1f%%"),
+                "avg_return%": st.column_config.NumberColumn("Avg return", format="%.2f%%"),
+                "vs_SPY%": st.column_config.NumberColumn("vs SPY", format="%+.2f%%"),
+                "beat_SPY%": st.column_config.NumberColumn("Beat SPY", format="%.1f%%"),
+                "avg_worst_dip%": st.column_config.NumberColumn("Avg worst dip", format="%.2f%%"),
+            },
+        )
 
 
 def render_backtest_page() -> None:
@@ -41,12 +71,19 @@ def render_backtest_page() -> None:
     else:
         tickers = _PRESETS[preset]
 
-    if not st.button("▶ Run backtest", type="primary"):
+    params = (tuple(tickers), years, step)
+    if st.button("▶ Run backtest", type="primary"):
+        with st.spinner(f"Backtesting {len(tickers)} tickers over {years} years…"):
+            st.session_state.backtest_result = run_signal_backtest(tickers, years=years, step=step)
+            st.session_state.backtest_params = params
+
+    # Kept in session state so picking a row below doesn't throw the results away.
+    result = st.session_state.get("backtest_result")
+    if result is None:
         st.info("Larger universes download a lot of history the first time (cached for 6 h afterwards).")
         return
-
-    with st.spinner(f"Backtesting {len(tickers)} tickers over {years} years…"):
-        result = run_signal_backtest(tickers, years=years, step=step)
+    if st.session_state.get("backtest_params") != params:
+        st.caption("Settings changed. Showing the previous run; press **Run backtest** to update.")
 
     if result.get("missing"):
         st.warning(f"No data for: {', '.join(result['missing'][:30])}")
@@ -69,6 +106,7 @@ def render_backtest_page() -> None:
         cols = ["n", "tickers"] + [c for c in table.columns if c.endswith(f"_{horizon}d")]
         st.subheader(title)
         st.dataframe(_highlight_baseline(table[cols]), width="stretch")
+        _render_stocks_behind(result, title, list(table.index), horizon)
 
     reg = result["regression"].get(horizon)
     if reg is not None and not reg.empty:
