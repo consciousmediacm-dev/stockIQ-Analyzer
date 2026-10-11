@@ -26,6 +26,7 @@ import numpy as np
 import pandas as pd
 
 from stockiq.backend.backtest.signals_vec import COMPONENTS, add_indicators, score_components
+from stockiq.backend.models.indicators import compute_rsi
 from stockiq.backend.models.signals import CANDLE_SIGNALS, bounce_score
 
 DEFAULT_HORIZONS: tuple[int, ...] = (5, 20, 60)
@@ -81,6 +82,44 @@ def _candle_label(weekly: pd.Series, monthly: pd.Series) -> np.ndarray:
     )
 
 
+BX_LABELS = ["3/3 · strong signal", "2/3 · signal", "0–1 · no signal"]
+
+
+def buying_pressure_strength(df: pd.DataFrame, timeframe: str) -> pd.Series:
+    """
+    Daily replay of the Analyzer's Buying Pressure (BX) panel
+    (models.indicators.compute_buying_pressure): for each trading day, the
+    number of BX conditions (0–3) met by the most recent *completed* weekly or
+    monthly bar — the same bar the live panel shows on that day. NaN while
+    fewer than 22 completed bars exist (the panel shows no signal then).
+    """
+    freq, per = {"monthly": ("MS", "M"), "weekly": ("W-FRI", "W-FRI")}[timeframe]
+    agg = {k: v for k, v in {"Open": "first", "High": "max", "Low": "min",
+                             "Close": "last", "Volume": "sum"}.items() if k in df.columns}
+    bars = df.resample(freq).agg(agg).dropna(subset=["Close"])
+    if bars.empty:
+        return pd.Series(np.nan, index=df.index)
+
+    rsi = compute_rsi(bars)
+    c1 = (rsi < 45) & (rsi > rsi.shift(1))
+    if "Volume" in bars.columns:
+        c2 = (bars["Volume"] / bars["Volume"].rolling(20).mean()) >= 1.5
+    else:
+        c2 = pd.Series(False, index=bars.index)
+    rng = bars["High"] - bars["Low"]
+    c3 = (rng > 0) & ((bars["Close"] - bars["Low"]) / rng.where(rng > 0) >= 0.60)
+    strength = c1.astype(int) + c2.fillna(False).astype(int) + c3.fillna(False).astype(int)
+    strength[np.arange(len(bars)) < 21] = np.nan      # live panel needs ≥ 22 bars
+
+    strength.index = bars.index.to_period(per)
+    prev_period = df.index.to_period(per) - 1           # last completed bar on each day
+    return pd.Series(strength.reindex(prev_period).to_numpy(), index=df.index)
+
+
+def _bx_label(strength: pd.Series) -> np.ndarray:
+    return np.select([strength >= 3, strength == 2, strength.notna()], BX_LABELS, default="n/a")
+
+
 def _rsi_zone(rsi: pd.Series) -> np.ndarray:
     return np.select([rsi <= 30, rsi >= 70], ["Oversold (≤30)", "Overbought (≥70)"], default="Neutral")
 
@@ -132,6 +171,8 @@ def build_ticker_panel(
     panel["weekly_green"] = candles["weekly_green"]
     panel["monthly_green"] = candles["monthly_green"]
     panel["candle_signal"] = _candle_label(candles["weekly_green"], candles["monthly_green"])
+    panel["bx_weekly"] = _bx_label(buying_pressure_strength(df, "weekly"))
+    panel["bx_monthly"] = _bx_label(buying_pressure_strength(df, "monthly"))
     for h in horizons:
         panel[f"ret_{h}"] = fwd[f"ret_{h}"]
         panel[f"mae_{h}"] = fwd[f"mae_{h}"]
@@ -304,6 +345,8 @@ def run_backtest(
     tables["RSI zone (NASDAQ RSI Scanner)"] = summarize(events, "rsi_zone", horizons)
     tables["MA200 Bounce Radar (±5%)"] = summarize(events, "bounce_radar", horizons)
     tables["MA200 Bounce Radar · top 30 per day"] = summarize(events, "bounce_top30", horizons)
+    tables["Buying Pressure (BX) · weekly"] = summarize(events, "bx_weekly", horizons, BX_LABELS)
+    tables["Buying Pressure (BX) · monthly"] = summarize(events, "bx_monthly", horizons, BX_LABELS)
     tables["Candle Screener signal"] = summarize(
         events, "candle_signal", horizons, [lbl for lbl, _ in CANDLE_SIGNALS]
     )
