@@ -43,7 +43,7 @@ def test_analyzer_ticker_is_sanitised_before_reaching_the_chart():
     at.query_params["tic"] = 'AAPL"});alert(1);//'
     at.run()
     assert not at.exception
-    value = at.text_input[1].value
+    value = at.session_state.ticker_val
     assert value == "AAPLALERT1"                     # letters/digits kept …
     assert not set(value) & set('"\'();/{}<> ')    # … nothing that can break out of the JS string
 

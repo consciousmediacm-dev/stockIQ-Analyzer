@@ -27,7 +27,7 @@
 
 | Page | What it does |
 |------|-------------|
-| **Stock Analyzer** | Interactive candlestick chart with MA5/20/50/100/200, weekly MA200, RSI subplot, Fibonacci retracement, 7 reversal patterns, Golden/Death cross, neutral indicator readout (no buy/sell verdict — see Backtesting) |
+| **Stock Analyzer** | Type-ahead search (top 5 matches across all US stocks and ETFs, ranked by name, symbol and trading volume, typo-tolerant); interactive candlestick chart with MA5/20/50/100/200, weekly MA200, RSI subplot, Fibonacci retracement, 7 reversal patterns, Golden/Death cross, neutral indicator readout (no buy/sell verdict — see Backtesting) |
 
 ### Scanners
 
@@ -160,6 +160,8 @@ AI forecast track record and backtest prices survive restarts.
 
 Templates: `.env.example` (local / Docker) and `.streamlit/secrets.toml.example` (Streamlit Cloud).
 Hosting on Streamlit Community Cloud (free): see [docs/DEPLOY_STREAMLIT.md](docs/DEPLOY_STREAMLIT.md).
+Each visitor can set dark/light mode, background colour, button colour and font size under
+**🎨 Appearance** in the sidebar; choices are kept in a browser cookie (nothing stored server-side).
 **Info → System Status** in the app shows which keys are set, provider health, cache ages and
 recent warnings.
 

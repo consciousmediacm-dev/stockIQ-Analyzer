@@ -5,6 +5,7 @@ import re
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
+from streamlit_searchbox import st_searchbox
 
 from stockiq.backend.services.analyzer_service import (
     get_company_display_name,
@@ -13,9 +14,10 @@ from stockiq.backend.services.analyzer_service import (
     get_stock_gaps,
     get_indicator_readout,
     get_ticker_fundamentals,
-    search_stocks,
+    suggest_tickers,
 )
 from stockiq.frontend.views.components.tv_symbols import to_tradingview_symbol
+from stockiq.frontend.layout.appearance import searchbox_style
 from stockiq.frontend.theme import BG, DN, MUT, NEU, SEP, UP, VAL
 from stockiq.frontend.views.components.gap_table import render_gap_table
 from stockiq.frontend.views.panels.analyzer_fundamentals import render_fundamentals_panel
@@ -30,6 +32,44 @@ _TICKER_CHARS = re.compile(r"[^A-Z0-9.\-^=!:&]")
 def _clean_ticker(raw: str) -> str:
     """Upper-case and keep only characters real symbols use (URL input reaches the chart's JS)."""
     return _TICKER_CHARS.sub("", (raw or "").upper().strip())[:24]
+
+
+def _suggest(query: str) -> list[tuple[str, str]]:
+    """Searchbox options as (label, symbol). A ticker-shaped query that isn't listed is
+    offered as-is last, so non-US Yahoo symbols (BTC-USD, ^GSPC) still work."""
+    results = suggest_tickers(query, 5)
+    options = [
+        (f"{r['symbol']}  —  {r['name']}  ·  {r['exchange']}{' · ETF' if r['type'] == 'ETF' else ''}", r["symbol"])
+        for r in results
+    ]
+    raw = _clean_ticker(query)
+    listed = {r["symbol"] for r in results}
+    looks_like_symbol = raw == query.strip().upper() and (not results or any(c in raw for c in "-^=.:!"))
+    if raw and looks_like_symbol and raw.replace(".", "-") not in listed:
+        options.append((f"{raw}  —  analyze this symbol as typed", raw))
+    return options
+
+
+def _pick_ticker(symbol: str | None) -> None:
+    if symbol:
+        st.session_state.ticker_val = _clean_ticker(symbol)
+        st.rerun(scope="app")                    # load the pick; keystrokes only rerun the fragment
+
+
+@st.fragment
+def _search_box() -> None:
+    """Keystrokes rerun just this fragment, so the rest of the page isn't rebuilt per letter."""
+    st_searchbox(
+        _suggest,
+        placeholder=f"Type a company or ticker — e.g. apple, NVDA, vanguard  (now: {st.session_state.ticker_val})",
+        key="ticker_search",
+        debounce=200,
+        rerun_scope="fragment",
+        submit_function=_pick_ticker,
+        style_overrides=searchbox_style(),
+        help="Top 5 matches across all US stocks and ETFs. Other Yahoo symbols "
+             "(BTC-USD, ^GSPC, EURUSD=X) can be typed in full and picked from the list.",
+    )
 
 
 _PERIODS = {"1D": 1, "1W": 7, "1M": 30, "3M": 90, "6M": 180, "1Y": 365, "2Y": 730, "5Y": 1825}
@@ -47,62 +87,38 @@ def render_analyzer_tab() -> None:
     if url_ticker and st.session_state.ticker_val != url_ticker:
         st.session_state.ticker_val = url_ticker
 
-    # ── Search + Ticker + Actions (single row) ───────────────────────────────
-    col_q, col_t, col_srch, col_analyze = st.columns([3, 2, 1, 1], vertical_alignment="bottom")
-    search_query = col_q.text_input(
-        "company_search",
-        placeholder="Name or symbol — stocks, ETFs, funds, indices, crypto, FX, futures",
-        label_visibility="collapsed",
-    )
-    ticker = col_t.text_input(
-        "Ticker Symbol", value=st.session_state.ticker_val, max_chars=24,
-        placeholder="Ticker, e.g. MSFT, BTC-USD, ^GSPC",
-    )
-    ticker = _clean_ticker(ticker)
-    search_clicked = col_srch.button("Search", use_container_width=True)
-    analyze_btn = col_analyze.button("Analyze", use_container_width=True, type="primary")
-
-    if search_clicked:
-        if search_query.strip():
-            with st.spinner("Searching…"):
-                st.session_state.search_results = search_stocks(search_query.strip())
-        else:
-            st.session_state.search_results = []
-
-    if st.session_state.search_results:
-        labels = [
-            f"{r['symbol']}  —  {r['name']}  ({r['exchange']}{' · ' + r['type'].title() if r.get('type') else ''})"
-            for r in st.session_state.search_results
-        ]
-        choice_idx = st.selectbox(
-            "Select a company", range(len(labels)), format_func=lambda i: labels[i]
-        )
-        st.session_state.ticker_val = st.session_state.search_results[choice_idx]["symbol"]
-        ticker = st.session_state.ticker_val
-    elif search_query and not st.session_state.search_results:
-        st.caption("No matches found — try a different name, or type the ticker directly.")
+    # ── Type-ahead search: top 5 matches update as you type ─────────────────
+    col_s, col_go = st.columns([6, 1], vertical_alignment="top")
+    with col_s:
+        _search_box()
+    analyze_btn = col_go.button("Refresh", use_container_width=True, type="primary",
+                                help="Reload the latest data for the current ticker")
+    ticker = _clean_ticker(st.session_state.ticker_val)
 
     auto_analyze = bool(url_ticker) and url_ticker != st.session_state.get("analyzer_ticker")
 
-    if not (analyze_btn or auto_analyze or ticker):
-        st.info("Enter a ticker symbol above and click **Analyze**.")
-        return
     if not ticker:
-        st.warning("Enter a ticker symbol above.")
+        st.info("Type a company or ticker above and pick a match.")
         return
 
     # ── Fetch & cache data ────────────────────────────────────────────────────
+    if st.session_state.get("analyzer_failed") == ticker and not analyze_btn:
+        st.error(f"No data found for **{ticker}**. Start typing the company name above to find the correct symbol.")
+        return
     if analyze_btn or auto_analyze or st.session_state.get("analyzer_ticker") != ticker:
+        st.session_state.analyzer_failed = None
         with st.spinner(f"Fetching data for **{ticker}**…"):
             try:
                 raw = get_stock_df(ticker)
             except Exception as e:
+                st.session_state.analyzer_failed = ticker
                 st.error(f"Failed to download data: {e}")
                 return
         if raw.empty:
+            st.session_state.analyzer_failed = ticker
             st.error(
                 f"No data found for **{ticker}**. "
-                "Use the Search box above to find the correct symbol."
+                "Start typing the company name above to find the correct symbol."
             )
             return
         if len(raw) < 2:
@@ -329,12 +345,12 @@ def _render_key_levels(latest, fib: dict, price: float) -> None:
 
 # ── Session state init & entry point ──────────────────────────────────────────
 for _k, _v in [
-    ("search_results", []),
     ("ticker_val", "MSFT"),
     ("analyzer_df", None),
     ("analyzer_ticker", None),
     ("analyzer_company", None),
     ("analyzer_fundamentals", {}),
+    ("analyzer_failed", None),
 ]:
     if _k not in st.session_state:
         st.session_state[_k] = _v
