@@ -92,3 +92,35 @@ def test_analyzer_shows_readout_and_no_buy_sell_badge(monkeypatch):
     page = " ".join(m.value for m in at.markdown)
     assert "Indicator Readout" in page and "moving averages" in page
     assert not any(w in page for w in ("STRONG BUY", "STRONG SELL", "Score +", "Score -"))
+
+
+def test_spy_index_strip_shows_full_prices():
+    import pandas as pd
+
+    from stockiq.frontend.views.panels.spy_header import _index_strip_html
+
+    idx = pd.DataFrame([{"Index": "Dow", "Price": 46123.456, "Change": -120.5, "Change %": -0.26},
+                        {"Index": "VIX", "Price": 15.2, "Change": 1.1, "Change %": 7.8}])
+    html = _index_strip_html(idx)
+    assert "46,123.46" in html and "-120.50" in html and "15.20" in html
+    assert "ellipsis" not in html and "flex-wrap:wrap" in html
+
+
+def test_backtest_page_keeps_results_and_lists_stocks(monkeypatch):
+    import stockiq.backend.services.backtest_service as svc
+    from stockiq.backend.backtest.engine import run_backtest
+    from tests.conftest import _make_ohlcv
+
+    prices = {f"T{i}": _make_ohlcv(n=1600, base_price=50 + 10 * i, seed=10 + i) for i in range(3)}
+    result = run_backtest(prices, _make_ohlcv(n=1600, base_price=300, seed=99), horizons=(5, 20, 60), step=5)
+    result.update(missing=[], markdown="# report")
+    monkeypatch.setattr(svc, "run_signal_backtest", lambda *a, **k: result)
+    monkeypatch.setattr(svc, "symbol_names", lambda: {})
+
+    at = AppTest.from_file(str(VIEWS / "backtest_page.py"), default_timeout=60).run()
+    at.button[0].click().run()
+    assert not at.exception, at.exception
+    n_tables = len(at.dataframe)
+    sel = at.selectbox(key="bt_row_RSI zone (NASDAQ RSI Scanner)")
+    sel.set_value("ALL (baseline)").run()                     # results survive the rerun
+    assert not at.exception and len(at.dataframe) == n_tables

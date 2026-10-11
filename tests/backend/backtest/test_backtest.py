@@ -237,3 +237,35 @@ def test_bx_columns_in_events(universe):
     assert set(ev["bx_weekly"]) <= {"3/3 · strong signal", "2/3 · signal", "0–1 · no signal", "n/a"}
     result = run_backtest(prices, bench, horizons=(20,), step=20)
     assert "Buying Pressure (BX) · monthly" in result["tables"]
+
+
+# ── Stocks behind a table row ─────────────────────────────────────────────────
+
+def test_ticker_breakdown_splits_a_row_by_stock(universe):
+    from stockiq.backend.backtest.engine import ticker_breakdown
+
+    prices, bench = universe
+    result = run_backtest(prices, bench, horizons=(20,), step=5)
+    ev, col = result["events"], result["group_cols"]["RSI zone (NASDAQ RSI Scanner)"]
+    table = result["tables"]["RSI zone (NASDAQ RSI Scanner)"]
+    group = [g for g in table.index if g != "ALL (baseline)"][0]
+
+    df = ticker_breakdown(ev, col, group, 20)
+    assert df["signals"].sum() == table.loc[group, "n"]          # every sample accounted for
+    assert len(df) == table.loc[group, "tickers"]
+    assert df["signals"].is_monotonic_decreasing
+    assert {"ticker", "vs_SPY%", "beat_SPY%", "last_signal"} <= set(df.columns)
+    assert ticker_breakdown(ev, col, "no such row", 20).empty
+
+
+def test_stocks_behind_row_adds_company_names(universe, monkeypatch):
+    import stockiq.backend.services.backtest_service as svc
+
+    prices, bench = universe
+    result = run_backtest(prices, bench, horizons=(20,), step=5)
+    monkeypatch.setattr(svc, "get_metadata", lambda: {"T0": {"name": "Zero Corp", "sector": "Tech"}})
+    monkeypatch.setattr(svc, "symbol_names", lambda: {"T1": "One Inc."})
+    df = svc.stocks_behind_row(result, "RSI zone (NASDAQ RSI Scanner)", "ALL (baseline)", 20)
+    names = dict(zip(df["ticker"], df["company"]))
+    assert names["T0"] == "Zero Corp" and names["T1"] == "One Inc."
+    assert list(df.columns[:3]) == ["ticker", "company", "sector"]
