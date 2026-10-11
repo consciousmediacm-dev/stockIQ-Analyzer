@@ -36,3 +36,13 @@ def offline(monkeypatch, tmp_path):
 def test_page_renders_without_exception_when_offline(page):
     at = AppTest.from_file(str(page), default_timeout=60).run()
     assert not at.exception, f"{page.name}: {at.exception[0].message}"
+
+
+def test_analyzer_ticker_is_sanitised_before_reaching_the_chart():
+    at = AppTest.from_file(str(VIEWS / "analyzer.py"), default_timeout=60)
+    at.query_params["tic"] = 'AAPL"});alert(1);//'
+    at.run()
+    assert not at.exception
+    value = at.text_input[1].value
+    assert value == "AAPLALERT1"                     # letters/digits kept …
+    assert not set(value) & set('"\'();/{}<> ')    # … nothing that can break out of the JS string

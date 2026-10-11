@@ -1,5 +1,7 @@
 """Stock Analyzer page — thin orchestrator that composes panels."""
 
+import re
+
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
@@ -13,6 +15,7 @@ from stockiq.backend.services.analyzer_service import (
     get_ticker_fundamentals,
     search_stocks,
 )
+from stockiq.frontend.views.components.tv_symbols import to_tradingview_symbol
 from stockiq.frontend.theme import BG, DN, MUT, NEU, SEP, UP, VAL
 from stockiq.frontend.views.components.gap_table import render_gap_table
 from stockiq.frontend.views.panels.analyzer_fundamentals import render_fundamentals_panel
@@ -20,6 +23,14 @@ from stockiq.frontend.views.panels.analyzer_signals import (
     render_buying_pressure,
     render_signal_analysis,
 )
+
+_TICKER_CHARS = re.compile(r"[^A-Z0-9.\-^=!:&]")
+
+
+def _clean_ticker(raw: str) -> str:
+    """Upper-case and keep only characters real symbols use (URL input reaches the chart's JS)."""
+    return _TICKER_CHARS.sub("", (raw or "").upper().strip())[:24]
+
 
 _PERIODS = {"1D": 1, "1W": 7, "1M": 30, "3M": 90, "6M": 180, "1Y": 365, "2Y": 730, "5Y": 1825}
 _DEFAULT_PERIOD = "1Y"
@@ -29,7 +40,7 @@ def render_analyzer_tab() -> None:
     st.title("🔬 Stock Analyzer")
 
     params     = st.query_params
-    url_ticker = params.get("tic", "").upper().strip()
+    url_ticker = _clean_ticker(params.get("tic", ""))
     url_period = params.get("period", _DEFAULT_PERIOD)
     url_rsi    = params.get("rsi", "1") != "0"
 
@@ -40,13 +51,14 @@ def render_analyzer_tab() -> None:
     col_q, col_t, col_srch, col_analyze = st.columns([3, 2, 1, 1], vertical_alignment="bottom")
     search_query = col_q.text_input(
         "company_search",
-        placeholder="Company name, e.g. Microsoft…",
+        placeholder="Name or symbol — stocks, ETFs, funds, indices, crypto, FX, futures",
         label_visibility="collapsed",
     )
     ticker = col_t.text_input(
-        "Ticker Symbol", value=st.session_state.ticker_val, max_chars=10,
-        placeholder="Ticker, e.g. MSFT",
-    ).upper().strip()
+        "Ticker Symbol", value=st.session_state.ticker_val, max_chars=24,
+        placeholder="Ticker, e.g. MSFT, BTC-USD, ^GSPC",
+    )
+    ticker = _clean_ticker(ticker)
     search_clicked = col_srch.button("Search", use_container_width=True)
     analyze_btn = col_analyze.button("Analyze", use_container_width=True, type="primary")
 
@@ -59,7 +71,7 @@ def render_analyzer_tab() -> None:
 
     if st.session_state.search_results:
         labels = [
-            f"{r['symbol']}  —  {r['name']}  ({r['exchange']})"
+            f"{r['symbol']}  —  {r['name']}  ({r['exchange']}{' · ' + r['type'].title() if r.get('type') else ''})"
             for r in st.session_state.search_results
         ]
         choice_idx = st.selectbox(
@@ -68,7 +80,7 @@ def render_analyzer_tab() -> None:
         st.session_state.ticker_val = st.session_state.search_results[choice_idx]["symbol"]
         ticker = st.session_state.ticker_val
     elif search_query and not st.session_state.search_results:
-        st.caption("No matches found — try a different name.")
+        st.caption("No matches found — try a different name, or type the ticker directly.")
 
     auto_analyze = bool(url_ticker) and url_ticker != st.session_state.get("analyzer_ticker")
 
@@ -260,7 +272,7 @@ def _render_tradingview_chart(ticker: str, period: str, show_rsi: bool) -> None:
         new TradingView.widget({{
           container_id: "tv_wrap",
           autosize:     true,
-          symbol:       "{ticker}",
+          symbol:       "{to_tradingview_symbol(ticker)}",
           interval:     "{interval}",
           range:        "{range_val}",
           timezone:     "America/New_York",

@@ -123,3 +123,36 @@ def get_universe(name: str = "sp500") -> list[str]:
 def get_security_names() -> dict[str, str]:
     """symbol → security name for every listed security (empty if cache not built)."""
     return {s["symbol"]: s["name"] for s in _load_listing()}
+
+
+def search_universe(query: str, limit: int = 15) -> list[dict]:
+    """
+    Search the local all-US listing (symbol and name). Works without any network
+    call, so names stay searchable when Yahoo's search API is unavailable.
+    Ranking: exact symbol, symbol prefix, name prefix, name contains.
+    Returns [{symbol, name, exchange, type}] like yf_fetch.search_companies.
+    """
+    q = query.strip().upper()
+    if not q:
+        return []
+    q_sym = q.replace(".", "-")
+    ranked: list[tuple[int, int, dict]] = []
+    for s in _load_listing():
+        sym, name = s["symbol"], s["name"].upper()
+        if sym == q_sym:
+            rank = 0
+        elif sym.startswith(q_sym):
+            rank = 1
+        elif name.startswith(q):
+            rank = 2
+        elif q in name:
+            rank = 3
+        else:
+            continue
+        ranked.append((rank, len(sym), s))
+    ranked.sort(key=lambda r: (r[0], r[1], r[2]["symbol"]))
+    return [
+        {"symbol": s["symbol"], "name": s["name"], "exchange": s["exchange"],
+         "type": "ETF" if s["is_etf"] else "EQUITY"}
+        for _, _, s in ranked[:limit]
+    ]

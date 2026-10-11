@@ -9,11 +9,24 @@ logger = logging.getLogger(__name__)
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
 
+# Every Yahoo quote type that has daily price history the analyzer can chart
+SEARCHABLE_TYPES = ("EQUITY", "ETF", "MUTUALFUND", "INDEX", "CRYPTOCURRENCY", "CURRENCY", "FUTURE")
+
+
 def search_companies(query: str) -> list[dict]:
-    """Return matching companies from Yahoo Finance search."""
+    """
+    Find symbols by company name or ticker.
+    Merges Yahoo Finance search (global stocks, ETFs, funds, indices, crypto, FX,
+    futures) with the local all-US listing (works offline). An exact symbol match
+    is always listed first; duplicates are removed.
+    """
+    from stockiq.backend.data.universe import search_universe
+
+    local = search_universe(query, limit=15)
+    remote: list[dict] = []
     try:
-        quotes = yf.Search(query, max_results=10, news_count=0).quotes
-        return [
+        quotes = yf.Search(query, max_results=20, news_count=0).quotes
+        remote = [
             {
                 "symbol":   r.get("symbol", ""),
                 "name":     r.get("shortname") or r.get("longname") or r.get("symbol", ""),
@@ -21,11 +34,18 @@ def search_companies(query: str) -> list[dict]:
                 "type":     r.get("quoteType", ""),
             }
             for r in quotes
-            if r.get("symbol") and r.get("quoteType") in ("EQUITY", "ETF", "MUTUALFUND", "INDEX")
+            if r.get("symbol") and r.get("quoteType") in SEARCHABLE_TYPES
         ]
     except Exception as exc:
         logger.warning("search_companies failed: %s", exc)
-        return []
+
+    exact = [r for r in local + remote if r["symbol"].upper() == query.strip().upper().replace(".", "-")]
+    merged, seen = [], set()
+    for r in exact[:1] + remote + local:
+        if r["symbol"] not in seen:
+            seen.add(r["symbol"])
+            merged.append(r)
+    return merged[:25]
 
 
 def fetch_ohlcv(ticker: str, period_days: int) -> pd.DataFrame:
