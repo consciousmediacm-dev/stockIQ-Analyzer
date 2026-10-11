@@ -22,11 +22,15 @@ def render_indicator_readout(readout: dict) -> None:
 
 def render_buying_pressure(df: pd.DataFrame) -> None:
     st.markdown("**Buying Pressure (BX)**")
-    st.caption("2/3 conditions = signal · 3/3 = strong · based on completed bars only")
+    st.caption("2/3 conditions = signal · 3/3 = strong · last completed weekly bar")
 
-    _render_bx_panel(get_buying_pressure(df, "monthly"), "Monthly")
-    st.markdown("<div style='margin-top:10px'></div>", unsafe_allow_html=True)
     _render_bx_panel(get_buying_pressure(df, "weekly"), "Weekly")
+    st.caption(
+        "Backtest (10 years, ~1,000 US stocks): weekly signals beat SPY by ~0.5–2 points more than "
+        "an average day over the next 20 trading days, then the edge faded. Typical dip along the way "
+        "was ~10%. A short swing setup, not a long-term pick. The monthly version was removed: it "
+        "underperformed in the broad market."
+    )
 
 
 # ── Private helpers ────────────────────────────────────────────────────────────
