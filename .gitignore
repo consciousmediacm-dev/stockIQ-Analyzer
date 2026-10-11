@@ -15,3 +15,4 @@ venv/
 # GCS service account key files — exclude all JSON except pre-built screener caches
 *.json
 !cache/screener/*.json
+reports/

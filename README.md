@@ -137,6 +137,28 @@ streamlit run app.py
 
 ---
 
+## Backtesting the signals
+
+Every buy/sell label in StockIQ can be replayed over history to see whether it actually worked.
+
+```bash
+python -m stockiq.backend.backtest --tickers 50 --years 10            # top 50 S&P names, 10 years
+python -m stockiq.backend.backtest --symbols AAPL MSFT --step 20      # non-overlapping 20-day samples
+python -m stockiq.backend.backtest --csv-dir ./vendor_prices          # TICKER.csv files from any vendor
+```
+
+The report (`reports/backtest/<date>/report.md` + CSVs) covers the Stock Analyzer signal score
+and each of its five components, RSI zones, the MA200 Bounce Radar and the Candle Screener, at
+5/20/60-day horizons: hit rate, mean/median return, excess return vs SPY, worst drawdown while
+holding (MAE) and a t-stat. A regression shows how much each score component really contributes.
+The same results are available in the app under **Research → Signal Backtest**.
+
+Entry is the next day's open (no look-ahead). Read the caveats at the top of every report —
+survivorship bias, overlapping windows and zero trading costs all flatter the results.
+Fundamentals-based scanners are not backtested because only a current snapshot is stored.
+
+---
+
 ## Running Tests
 
 ```bash

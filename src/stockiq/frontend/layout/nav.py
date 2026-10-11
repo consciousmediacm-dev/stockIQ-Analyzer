@@ -31,6 +31,9 @@ def get_pages() -> dict:
             st.Page(f"{_VIEWS}/munger_strategy_scanner.py", title="Munger Value Picks",    icon="🎩", url_path="munger"),
             st.Page(f"{_VIEWS}/etf_scanner.py",             title="ETF Scanner",           icon="🌐", url_path="etf-scanner"),
         ],
+        "Research": [
+            st.Page(f"{_VIEWS}/backtest_page.py", title="Signal Backtest", icon="🧪", url_path="backtest"),
+        ],
         "Info": [
             st.Page(f"{_VIEWS}/about.py", title="About StockIQ", icon="ℹ️", url_path="about"),
         ],

@@ -5,6 +5,7 @@ from ._shared import (
     pd, yf, datetime, timedelta,
     get_metadata, _batch_download, _rsi_last,
 )
+from stockiq.backend.models.signals import candle_momentum_signal
 
 
 @ttl_cache(CACHE_TTL["fetch_spx_candle_momentum_scan"])
@@ -107,16 +108,7 @@ def fetch_spx_candle_momentum_scan() -> pd.DataFrame:
             monthly_green = sum(1 for _, r in m4.iterrows() if r["Close"] > r["Open"])
             monthly_dots  = ["🟢" if r["Close"] > r["Open"] else "🔴" for _, r in m4.iterrows()]
 
-            if weekly_green == 4 and monthly_green == 4:
-                signal, sig_order = "🟢 Strong Buy", 1
-            elif weekly_green == 4 and monthly_green >= 3:
-                signal, sig_order = "🟢 Buy", 2
-            elif weekly_green >= 3 and monthly_green >= 3:
-                signal, sig_order = "🟡 Accumulate", 3
-            elif weekly_green >= 2:
-                signal, sig_order = "🟠 Caution", 4
-            else:
-                signal, sig_order = "🔴 Sell", 5
+            signal, sig_order = candle_momentum_signal(weekly_green, monthly_green)
 
             recommendations.append({
                 "Ticker":    ticker,

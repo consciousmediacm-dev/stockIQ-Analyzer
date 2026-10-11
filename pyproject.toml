@@ -18,6 +18,7 @@ dependencies = [
     "pyyaml>=6.0",
     "requests>=2.28",
     "pyarrow>=15.0,<24.0",
+    "tabulate>=0.9",
 ]
 
 [project.urls]

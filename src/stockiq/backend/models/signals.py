@@ -118,3 +118,41 @@ def find_crosses(df: pd.DataFrame) -> tuple[pd.DatetimeIndex, pd.DatetimeIndex]:
     golden = common[(sign == 1)  & (sign_shift == -1)]
     death  = common[(sign == -1) & (sign_shift ==  1)]
     return golden, death
+
+
+# ── Scanner scoring rules (shared by live screeners and the backtester) ───────
+
+CANDLE_SIGNALS: list[tuple[str, int]] = [
+    ("🟢 Strong Buy", 1),
+    ("🟢 Buy", 2),
+    ("🟡 Accumulate", 3),
+    ("🟠 Caution", 4),
+    ("🔴 Sell", 5),
+]
+
+
+def candle_momentum_signal(weekly_green: int, monthly_green: int) -> tuple[str, int]:
+    """
+    Map green-candle counts over the last 4 weeks / 4 months to (label, sort_order).
+    Used by the Candle Screener and the backtester.
+    """
+    if weekly_green == 4 and monthly_green == 4:
+        return CANDLE_SIGNALS[0]
+    if weekly_green == 4 and monthly_green >= 3:
+        return CANDLE_SIGNALS[1]
+    if weekly_green >= 3 and monthly_green >= 3:
+        return CANDLE_SIGNALS[2]
+    if weekly_green >= 2:
+        return CANDLE_SIGNALS[3]
+    return CANDLE_SIGNALS[4]
+
+
+def bounce_score(dist_pct: float, rsi: float, threshold_pct: float = 5.0) -> float:
+    """
+    MA200 Bounce Radar score: proximity to MA200 + oversold RSI + below-MA200 support bonus.
+    Only meaningful when abs(dist_pct) <= threshold_pct.
+    """
+    proximity_bonus = (threshold_pct - abs(dist_pct)) * 2
+    oversold_bonus  = max(0.0, 50.0 - rsi)
+    support_bonus   = 8.0 if dist_pct < 0 else 0.0
+    return proximity_bonus + oversold_bonus + support_bonus
